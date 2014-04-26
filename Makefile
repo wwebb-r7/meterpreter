@@ -18,43 +18,15 @@ COMPILED=${ROOT}/${build_tmp}/compiled
 objects  = $(COMPILED)/libc.so
 objects += $(COMPILED)/libcrypto.so
 objects += $(COMPILED)/libssl.so
+objects += $(COMPILED)/libpcap.so
 objects += $(COMPILED)/libsupport.so
 objects += $(COMPILED)/libmetsrv_main.so
-objects += $(COMPILED)/libpcap.so
+
 
 outputs  = data/meterpreter/msflinker_linux_x86.bin
 outputs += data/meterpreter/ext_server_stdapi.lso
 outputs += data/meterpreter/ext_server_sniffer.lso
 outputs += data/meterpreter/ext_server_networkpug.lso
-
-#PCAP_CFLAGS = -march=i386 -m32 -Wl,--hash-style=sysv -fno-stack-protector -nostdinc -nostdlib -fPIC -DPIC -g -Wall -D_UNIX -D__linux__  -I$(LIBC)/include -I$(LIBC)/kernel/common/linux/ -I$(LIBC)/kernel/common/ -I$(LIBC)/arch-x86/include/ -I$(LIBC)/kernel/arch-x86/ -Dwchar_t="char" -fno-builtin -D_SIZE_T_DECLARED -DElf_Size="u_int32_t" -D_BYTE_ORDER=_LITTLE_ENDIAN -lgcc -L$(COMPILED) -fPIC -Os -lc
-PCAP_CFLAGS = \
- -Os \
- -Wl,--hash-style=sysv \
- -march=i386 \
- -m32 \
- -fno-stack-protector \
- -nostdinc \
- -nostdlib \
- -fno-builtin \
- -fPIC \
- -DPIC \
- -Wall \
- -lc \
- -I$(LIBC)/include \
- -I$(LIBC)/kernel/common/linux/ \
- -I$(LIBC)/kernel/common/ \
- -I$(LIBC)/arch-x86/include/ \
- -I$(LIBC)/kernel/arch-x86/ \
- -L$(COMPILED) \
- -Dwchar_t="char" \
- -D_SIZE_T_DECLARED \
- -DElf_Size="u_int32_t" \
- -D_BYTE_ORDER=_LITTLE_ENDIAN \
- -D_UNIX \
- -D__linux__ \
- -lgcc
-
 
 workspace = workspace
 
@@ -95,7 +67,7 @@ $(build_tmp)/libpcap-1.1.1/libpcap.so.1.1.1:
 	[ -d $(build_tmp) ] || mkdir $(build_tmp)
 	[ -f $(build_tmp)/libpcap-1.1.1.tar.gz ] || wget -O $(build_tmp)/libpcap-1.1.1.tar.gz http://www.tcpdump.org/release/libpcap-1.1.1.tar.gz
 	[ -f $(build_tmp)/libpcap-1.1.1/configure ] || tar -C $(build_tmp) -xzf $(build_tmp)/libpcap-1.1.1.tar.gz
-	(cd $(build_tmp)/libpcap-1.1.1 && ./configure --disable-bluetooth --without-bluetooth --without-usb --disable-usb --without-can --disable-can --without-usb-linux --disable-usb-linux --without-libnl)
+	(cd $(build_tmp)/libpcap-1.1.1 && CC=$(COMPILED)/musl/bin/musl-gcc ./configure --disable-bluetooth --without-bluetooth --without-usb --disable-usb --without-can --disable-can --without-usb-linux --disable-usb-linux --without-libnl)
 	echo '#undef HAVE_DECL_ETHER_HOSTTON' >> $(build_tmp)/libpcap-1.1.1/config.h
 	echo '#undef HAVE_SYS_BITYPES_H' >> $(build_tmp)/libpcap-1.1.1/config.h
 	echo '#undef PCAP_SUPPORT_CAN' >> $(build_tmp)/libpcap-1.1.1/config.h
@@ -105,8 +77,7 @@ $(build_tmp)/libpcap-1.1.1/libpcap.so.1.1.1:
 	(cd $(build_tmp)/libpcap-1.1.1 && patch -p0 < $(cwd)/source/libpcap/pcap_nametoaddr_fix.diff)
 	(cd $(build_tmp)/libpcap-1.1.1 && patch -p0 < $(cwd)/source/libpcap/pcap-linux.diff)
 	sed -i -e s/pcap-usb-linux.c//g -e s/fad-getad.c/fad-gifc.c/g $(build_tmp)/libpcap-1.1.1/Makefile
-	sed -i -e s^"CC = gcc"^"CC = gcc $(PCAP_CFLAGS)"^g $(build_tmp)/libpcap-1.1.1/Makefile
-	$(MAKE) -C $(build_tmp)/libpcap-1.1.1
+	CC=$(COMPILED)/musl/bin/musl-gcc  $(MAKE) -C $(build_tmp)/libpcap-1.1.1
 
 
 data/meterpreter/msflinker_linux_x86.bin: source/server/rtld/msflinker.bin
