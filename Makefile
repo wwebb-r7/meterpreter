@@ -73,10 +73,10 @@ $(COMPILED)/libc.so: $(COMPILED)
 	cp ${COMPILED}/musl/lib/libc.so ${COMPILED}/libc.so
 
 $(COMPILED)/libcrypto.so: $(build_tmp)/openssl-1.0.1g/libssl.so
-	cp $(build_tmp)/openssl-1.0.1g/libcrypto.so source/bionic/compiled/libcrypto.so
+	cp $(build_tmp)/openssl-1.0.1g/libcrypto.so $(COMPILED)/libcrypto.so
 
 $(COMPILED)/libssl.so: $(build_tmp)/openssl-1.0.1g/libssl.so
-	cp $(build_tmp)/openssl-1.0.1g/libssl.so source/bionic/compiled/libssl.so
+	cp $(build_tmp)/openssl-1.0.1g/libssl.so $(COMPILED)/libssl.so
 
 $(build_tmp)/openssl-1.0.1g/libssl.so:
 	[ -d $(build_tmp) ] || mkdir $(build_tmp)
