@@ -55,30 +55,6 @@ PCAP_CFLAGS = \
  -D__linux__ \
  -lgcc
 
-#OSSL_CFLAGS = -Os -Wl,--hash-style=sysv -march=i386 -m32 -nostdinc -nostdlib -fno-builtin -fpic -I $(LIBC)/include -I $(LIBC)/kernel/common/linux/ -I $(LIBC)/kernel/common/ -I $(LIBC)/arch-x86/include/ -I $(LIBC)/kernel/arch-x86/  -I$(LIBC)/private -I$(LIBM)/include -DPIC -Dwchar_t='char' -D_SIZE_T_DECLARED -DElf_Size='u_int32_t' -D_BYTE_ORDER=_LITTLE_ENDIAN -L$(COMPILED) -lc
-OSSL_CFLAGS = \
- -Os \
- -Wl,--hash-style=sysv \
- -march=i386 \
- -m32 \
- -nostdinc \
- -nostdlib \
- -fno-builtin \
- -fpic \
- -DPIC \
- -lc \
- -I $(LIBC)/include \
- -I $(LIBC)/kernel/common/linux/ \
- -I $(LIBC)/kernel/common/ \
- -I $(LIBC)/arch-x86/include/ \
- -I $(LIBC)/kernel/arch-x86/ \
- -I$(LIBC)/private \
- -I$(LIBM)/include \
- -L$(COMPILED) \
- -Dwchar_t='char' \
- -D_SIZE_T_DECLARED \
- -DElf_Size='u_int32_t' \
- -D_BYTE_ORDER=_LITTLE_ENDIAN \
 
 workspace = workspace
 
@@ -96,26 +72,21 @@ $(COMPILED)/libc.so: $(COMPILED)
 	(cd ${ROOT}/source/musl ; ./configure --prefix=${COMPILED}/musl --syslibdir=${COMPILED}/musl --enable-gcc-wrapper ; make && make install )
 	cp ${COMPILED}/musl/lib/libc.so ${COMPILED}/libc.so
 
-$(COMPILED)/libcrypto.so: $(build_tmp)/openssl-0.9.8za/libssl.so
-	cp $(build_tmp)/openssl-0.9.8za/libcrypto.so source/bionic/compiled/libcrypto.so
+$(COMPILED)/libcrypto.so: $(build_tmp)/openssl-1.0.1g/libssl.so
+	cp $(build_tmp)/openssl-1.0.1g/libcrypto.so source/bionic/compiled/libcrypto.so
 
-$(COMPILED)/libssl.so: $(build_tmp)/openssl-0.9.8za/libssl.so
-	cp $(build_tmp)/openssl-0.9.8za/libssl.so source/bionic/compiled/libssl.so
+$(COMPILED)/libssl.so: $(build_tmp)/openssl-1.0.1g/libssl.so
+	cp $(build_tmp)/openssl-1.0.1g/libssl.so source/bionic/compiled/libssl.so
 
-$(build_tmp)/openssl-0.9.8za/libssl.so:
+$(build_tmp)/openssl-1.0.1g/libssl.so:
 	[ -d $(build_tmp) ] || mkdir $(build_tmp)
-	[ -f $(build_tmp)/openssl-0.9.8za.tar.gz ] || wget -O $(build_tmp)/openssl-0.9.8za.tar.gz https://www.openssl.org/source/openssl-0.9.8za.tar.gz
-	[ -d $(build_tmp)/openssl-0.9.8za ] || tar -C $(build_tmp)/ -xzf $(build_tmp)/openssl-0.9.8za.tar.gz
-	(cd $(build_tmp)/openssl-0.9.8za &&                                                       \
-		cat Configure | grep -v 'linux-msf' | \
-		sed -e 's#my %table=(#my %table=(     \
-			"linux-msf", "gcc:$(OSSL_CFLAGS) -DL_ENDIAN -DTERMIO -Wall::-D_REENTRANT::$(OSSL_CFLAGS) -ldl:BN_LLONG $${x86_gcc_des} $${x86_gcc_opts}:$${x86_elf_asm}:dlfcn:linux-shared:$(OSSL_CFLAGS) -fPIC::.so.\\$$\\$$(SHLIB_MAJOR).\\$$\\$$(SHLIB_MINOR)",\
-		#;' > Configure-msf;\
-		cp Configure-msf Configure && chmod +x Configure && \
-		grep linux-msf Configure && \
-		./Configure --prefix=/tmp/out threads shared no-hw no-dlfcn no-zlib no-krb5 no-idea 386 linux-msf \
+	[ -f $(build_tmp)/openssl-1.0.1g.tar.gz ] || wget -O $(build_tmp)/openssl-1.0.1g.tar.gz https://www.openssl.org/source/openssl-1.0.1g.tar.gz
+	[ -d $(build_tmp)/openssl-1.0.1g ] || tar -C $(build_tmp)/ -xzf $(build_tmp)/openssl-1.0.1g.tar.gz
+	(cd $(build_tmp)/openssl-1.0.1g &&                                                       \
+		CC=$(COMPILED)/musl/bin/musl-gcc ./Configure --prefix=/tmp/out threads shared no-hw no-dlfcn no-zlib no-krb5 no-idea linux-generic64 && \
+		patch -p1 < $(ROOT)/patches/linux-musl-libc-termios.patch \
 	)
-	(cd $(build_tmp)/openssl-0.9.8za && $(MAKE) depend all ; [ -f libssl.so.0.9.8 -a -f libcrypto.so.0.9.8 ] )
+	(cd $(build_tmp)/openssl-1.0.1g && $(MAKE) depend all ; [ -f libssl.so.1.0.0 -a -f libcrypto.so.1.0.0 ] )
 
 $(COMPILED)/libpcap.so: $(build_tmp)/libpcap-1.1.1/libpcap.so.1.1.1
 	cp $(build_tmp)/libpcap-1.1.1/libpcap.so.1.1.1 $(COMPILED)/libpcap.so
@@ -199,7 +170,7 @@ clean-pcap:
 	rm -r $(build_tmp)/libpcap-1.1.1 || true
 
 clean-ssl:
-	make -C $(build_tmp)/openssl-0.9.8za/ clean
+	make -C $(build_tmp)/openssl-1.0.1g/ clean
 
 really-clean: clean clean-ssl clean-pcap depclean
 
