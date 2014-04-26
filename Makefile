@@ -9,15 +9,13 @@ framework_dir = ../metasploit-framework/
 build_tmp = posix-meterp-build-tmp
 cwd=$(shell pwd)
 
+BUILDARCH=$(uname -m)-$(file /bin/ls | grep -o '[ML]SB')
+
 ROOT=$(basename $(CURDIR:%/=%))
-BIONIC=$(ROOT)/source/bionic
-LIBC=$(BIONIC)/libc
-LIBM=$(BIONIC)/libm
-COMPILED=$(BIONIC)/compiled
+
+COMPILED=${ROOT}/${build_tmp}/compiled
 
 objects  = $(COMPILED)/libc.so
-objects += $(COMPILED)/libm.so
-objects += $(COMPILED)/libdl.so
 objects += $(COMPILED)/libcrypto.so
 objects += $(COMPILED)/libssl.so
 objects += $(COMPILED)/libsupport.so
@@ -95,17 +93,8 @@ $(COMPILED):
 	mkdir $(COMPILED)/
 
 $(COMPILED)/libc.so: $(COMPILED)
-	(cd source/bionic/libc && ARCH=x86 TOP=${ROOT} jam)
-	(cd source/bionic/libc/out/x86/ && $(MAKE) -f Makefile.msf && [ -f libbionic.so ])
-	cp source/bionic/libc/out/x86/libbionic.so $(COMPILED)/libc.so
-
-$(COMPILED)/libm.so:
-	$(MAKE) -C $(LIBM) -f Makefile.msf && [ -f $(LIBM)/libm.so ]
-	cp $(LIBM)/libm.so $(COMPILED)/libm.so
-
-$(COMPILED)/libdl.so:
-	$(MAKE) -C $(BIONIC)/libdl && [ -f $(BIONIC)/libdl/libdl.so ]
-	cp $(BIONIC)/libdl/libdl.so $(COMPILED)/libdl.so
+	(cd ${ROOT}/source/musl ; ./configure --prefix=${COMPILED}/musl --syslibdir=${COMPILED}/musl --enable-gcc-wrapper ; make && make install )
+	cp ${COMPILED}/musl/lib/libc.so ${COMPILED}/libc.so
 
 $(COMPILED)/libcrypto.so: $(build_tmp)/openssl-0.9.8za/libssl.so
 	cp $(build_tmp)/openssl-0.9.8za/libcrypto.so source/bionic/compiled/libcrypto.so
