@@ -109,7 +109,7 @@ $(COMPILED)/libmetsrv_main.so: $(workspace)/metsrv/libmetsrv_main.so
 	cp $(workspace)/metsrv/libmetsrv_main.so $(COMPILED)/libmetsrv_main.so
 
 $(workspace)/common/libsupport.so:
-	$(MAKE) -C $(workspace)/common
+	$(MAKE) -C $(workspace)/common CC="${CROSS}gcc" AR="${CROSS}ar" RANLIB="${CROSS}ranlib" LD="${CROSS}ld" MAKEDEPPROG="${CROSS}gcc"
 
 $(COMPILED)/libsupport.so: $(workspace)/common/libsupport.so
 	cp $(workspace)/common/libsupport.so $(COMPILED)/libsupport.so
