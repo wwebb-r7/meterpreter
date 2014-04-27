@@ -7,6 +7,10 @@ unsigned int seqno;
 
 typedef int (*netlink_cb_t)(struct nlmsghdr *nh, void *data);
 
+
+void address_calculate_netmask(struct iface_address *address, int ifa_prefixlen);
+void iface_entry_append_address(struct iface_entry *iface, struct iface_address *address);
+
 /*
  * Open a netlink socket. Maybe in the future we'll support another type.
  */
