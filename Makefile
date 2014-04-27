@@ -14,14 +14,17 @@ build_dep = posix-meterp-build-dep
 
 BUILDARCH=$(uname -m)-$(file /bin/ls | grep -o '[ML]SB')
 
+PCAP_HOST=mips-linux
+
+
 ROOT=$(basename $(CURDIR:%/=%))
 
 COMPILED=${ROOT}/${build_tmp}/compiled
 
 objects  = $(COMPILED)/libc.so
+objects += $(COMPILED)/libpcap.so
 objects += $(COMPILED)/libcrypto.so
 objects += $(COMPILED)/libssl.so
-objects += $(COMPILED)/libpcap.so
 objects += $(COMPILED)/libsupport.so
 objects += $(COMPILED)/libmetsrv_main.so
 
@@ -40,15 +43,20 @@ debug: MAKE += debug
 debug: all
 
 $(build_dep):
-	mkdir $(build_dep)/
+	[ -d $(build_dep) ] || mkdir $(build_dep)/
+
+build_tmp:
+	[ -d $(build_tmp) ] || mkdir $(build_tmp)/
 
 dependencies: $(build_dep)
 	[ -f $(build_dep)/openssl-1.0.1g.tar.gz ] || wget -O $(build_dep)/openssl-1.0.1g.tar.gz https://www.openssl.org/source/openssl-1.0.1g.tar.gz
-	[ -f $(build_dep)/libpcap-1.1.1.tar.gz ] || wget -O $(build_dep)/libpcap-1.1.1.tar.gz http://www.tcpdump.org/release/libpcap-1.1.1.tar.gz
+	[ -f $(build_dep)/libpcap-1.5.3.tar.gz ] || wget -O $(build_dep)/libpcap-1.5.3.tar.gz http://www.tcpdump.org/release/libpcap-1.5.3.tar.gz
 	[ -f $(build_dep)/crossx86-mips-linux-musl-1.0.0.tar.xz ] || wget -O $(build_dep)/crossx86-mips-linux-musl-1.0.0.tar.xz https://googledrive.com/host/0BwnS5DMB0YQ6bDhPZkpOYVFhbk0/musl-1.0.0/crossx86-mips-linux-musl-1.0.0.tar.xz
 
+extract_mips:
+	# tar xJvf ../posix-meterp-build-dep/crossx86-mips-linux-musl-1.0.0.tar.xz mips-linux-musl/
 
-$(COMPILED): dependencies build_tmp
+$(COMPILED): dependencies extract_mips build_tmp
 	[ -d $(COMPILED)/ ] || mkdir $(COMPILED)/
 
 $(COMPILED)/libc.so: $(COMPILED)
@@ -65,28 +73,27 @@ $(build_tmp)/openssl-1.0.1g/libssl.so:
 	[ -d $(build_tmp) ] || mkdir $(build_tmp)
 	[ -d $(build_tmp)/openssl-1.0.1g ] || tar -C $(build_tmp)/ -xzf $(build_dep)/openssl-1.0.1g.tar.gz
 	(cd $(build_tmp)/openssl-1.0.1g &&                                                       \
-		CC=$(COMPILED)/musl/bin/musl-gcc ./Configure --prefix=/tmp/out threads shared no-hw no-dlfcn no-zlib no-krb5 no-idea linux-generic64 && \
+		 CC="${CROSS}gcc" AR="${CROSS}ar" RANLIB="${CROSS}ranlib" LD="${CROSS}ld" MAKEDEPPROG="${CROSS}gcc" ./Configure --prefix=/tmp/out threads shared no-hw no-dlfcn no-zlib no-krb5 no-idea linux-generic32 && \
 		patch -p1 < $(ROOT)/patches/linux-musl-libc-termios.patch \
 	)
 	(cd $(build_tmp)/openssl-1.0.1g && $(MAKE) depend all ; [ -f libssl.so.1.0.0 -a -f libcrypto.so.1.0.0 ] )
 
-$(COMPILED)/libpcap.so: $(build_tmp)/libpcap-1.1.1/libpcap.so.1.1.1
-	cp $(build_tmp)/libpcap-1.1.1/libpcap.so.1.1.1 $(COMPILED)/libpcap.so
+$(COMPILED)/libpcap.so: $(build_tmp)/libpcap-1.5.3/libpcap.so.1.5.3
+	cp $(build_tmp)/libpcap-1.5.3/libpcap.so.1.5.3 $(COMPILED)/libpcap.so
 
-$(build_tmp)/libpcap-1.1.1/libpcap.so.1.1.1:
+$(build_tmp)/libpcap-1.5.3/libpcap.so.1.5.3:
 	[ -d $(build_tmp) ] || mkdir $(build_tmp)
-	[ -f $(build_tmp)/libpcap-1.1.1/configure ] || tar -C $(build_tmp) -xzf $(build_dep)/libpcap-1.1.1.tar.gz
-	(cd $(build_tmp)/libpcap-1.1.1 && CC=$(COMPILED)/musl/bin/musl-gcc ./configure --disable-bluetooth --without-bluetooth --without-usb --disable-usb --without-can --disable-can --without-usb-linux --disable-usb-linux --without-libnl)
-	echo '#undef HAVE_DECL_ETHER_HOSTTON' >> $(build_tmp)/libpcap-1.1.1/config.h
-	echo '#undef HAVE_SYS_BITYPES_H' >> $(build_tmp)/libpcap-1.1.1/config.h
-	echo '#undef PCAP_SUPPORT_CAN' >> $(build_tmp)/libpcap-1.1.1/config.h
-	echo '#undef PCAP_SUPPORT_USB' >> $(build_tmp)/libpcap-1.1.1/config.h
-	echo '#undef HAVE_ETHER_HOSTTON'  >> $(build_tmp)/libpcap-1.1.1/config.h
-	echo '#define _STDLIB_H this_works_around_malloc_definition_in_grammar_dot_c' >> $(build_tmp)/libpcap-1.1.1/config.h
-	(cd $(build_tmp)/libpcap-1.1.1 && patch -p0 < $(cwd)/source/libpcap/pcap_nametoaddr_fix.diff)
-	(cd $(build_tmp)/libpcap-1.1.1 && patch -p0 < $(cwd)/source/libpcap/pcap-linux.diff)
-	sed -i -e s/pcap-usb-linux.c//g -e s/fad-getad.c/fad-gifc.c/g $(build_tmp)/libpcap-1.1.1/Makefile
-	CC=$(COMPILED)/musl/bin/musl-gcc  $(MAKE) -C $(build_tmp)/libpcap-1.1.1
+	[ -f $(build_tmp)/libpcap-1.5.3/configure ] || tar -C $(build_tmp) -xzf $(build_dep)/libpcap-1.5.3.tar.gz
+	(cd $(build_tmp)/libpcap-1.5.3 && CC="${CROSS}gcc" AR="${CROSS}ar" RANLIB="${CROSS}ranlib" LD="${CROSS}ld" MAKEDEPPROG="${CROSS}gcc"  ./configure --host=$(PCAP_HOST)  --with-pcap=linux --disable-bluetooth --without-bluetooth --without-usb --disable-usb --without-can --disable-can --without-usb-linux --disable-usb-linux --without-libnl)
+	echo '#undef HAVE_DECL_ETHER_HOSTTON' >> $(build_tmp)/libpcap-1.5.3/config.h
+	echo '#undef HAVE_SYS_BITYPES_H' >> $(build_tmp)/libpcap-1.5.3/config.h
+	echo '#undef PCAP_SUPPORT_CAN' >> $(build_tmp)/libpcap-1.5.3/config.h
+	echo '#undef PCAP_SUPPORT_USB' >> $(build_tmp)/libpcap-1.5.3/config.h
+	echo '#undef HAVE_ETHER_HOSTTON'  >> $(build_tmp)/libpcap-1.5.3/config.h
+	# echo '#define _STDLIB_H this_works_around_malloc_definition_in_grammar_dot_c' >> $(build_tmp)/libpcap-1.5.3/config.h
+	(cd $(build_tmp)/libpcap-1.5.3 && patch -p0 < $(cwd)/source/libpcap/pcap_nametoaddr_fix.diff)
+	sed -i -e s/pcap-usb-linux.c//g -e s/fad-getad.c/fad-gifc.c/g $(build_tmp)/libpcap-1.5.3/Makefile
+	$(MAKE) -C $(build_tmp)/libpcap-1.5.3
 
 
 data/meterpreter/msflinker_linux_x86.bin: source/server/rtld/msflinker.bin
@@ -143,14 +150,16 @@ depclean:
 	rm -rf $(build_tmp)
 
 clean-pcap:
-	#(cd $(build_tmp)/libpcap-1.1.1/ && make clean)
+	#(cd $(build_tmp)/libpcap-1.5.3/ && make clean)
 	# This avoids the pcap target trying to patch the same file more than once.
 	# It's a pretty small tar, so untar'ing goes pretty quickly anyway, in
 	# contrast to openssl.
-	rm -r $(build_tmp)/libpcap-1.1.1 || true
+	rm -r $(build_tmp)/libpcap-1.5.3 || true
 
 clean-ssl:
 	make -C $(build_tmp)/openssl-1.0.1g/ clean
+
+
 
 really-clean: clean clean-ssl clean-pcap depclean
 
