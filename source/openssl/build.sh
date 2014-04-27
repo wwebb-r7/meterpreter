@@ -1,5 +1,8 @@
 #!/bin/sh
 
+echo "THIS FILE IS OUTDATED"
+exit 1
+
 set -e
 
 #OSSL=openssl-0.9.8n

@@ -1,6 +1,7 @@
 #ifndef	UNIX_COMPAT_TYPES_H
 #define	UNIX_COMPAT_TYPES_H
-#include <sys/errno.h>
+
+#include <errno.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 
@@ -13,7 +14,12 @@
 #error unknown OS
 #endif
 
+#ifndef NULL
+// Per the recent openbsd openssl cleanup .. if your system doesn't 
+// have NULL defined, take it back for a refund ..
 #define NULL	((void *)0)
+#endif
+
 
 #if 0
 // PKS, should use system headers.

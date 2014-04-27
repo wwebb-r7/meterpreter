@@ -68,8 +68,11 @@ typedef struct _THREAD
 #endif
 } THREAD, * LPTHREAD;
 
-#ifdef __GNUC__
-#define THREADCALL __attribute__((stdcall))
+#ifdef _UNIX
+// musl doesn't define __GNUC__ etc, so change above to _UNIX. 
+// let's just ignore this whole stdcall business stuff for now
+// so we can power through and see what other issues we have :>
+#define THREADCALL // __attribute__((stdcall))
 #else // ! gcc
 #define THREADCALL __stdcall
 #endif

@@ -30,7 +30,10 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/select.h>
-#include <sys/endian.h>
+
+// musl doesn't ship with this, it seems.
+// #include <sys/endian.h>
+
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -40,7 +43,8 @@
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 
-#include <sys/atomics.h>
+// musl doesn't ship with this, it seems.
+// #include <sys/atomics.h>
 
 #include <sys/ptrace.h>
 #include <user.h>
