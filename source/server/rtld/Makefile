@@ -1,49 +1,41 @@
 
-CFLAGS+=-I${PWD}/hack
-CFLAGS+= -I ../../bionic/libc/include -I ../../bionic/libc/kernel/common/linux/ -I ../../bionic/libc/kernel/common/ -I ../../bionic/libc/arch-x86/include/
-CFLAGS+= -I ../../bionic/libc/kernel/arch-x86/ -I../../source/server/elf/headers -I../../bionic/libc/private -fPIC -DPIC
-CFLAGS+= -nostdinc -nostdlib -Dwchar_t="char" -fno-builtin -D_SIZE_T_DECLARED -DElf_Size="u_int32_t" -DANDROID_X86_LINKER
-CFLAGS+= -DMETSRV_RTLD -D_BYTE_ORDER=_LITTLE_ENDIAN
+CFLAGS=-fPIC -DPIC
 
-CFLAGS+= -march=i386 -m32
+OBJ=zlib.o
 
-OBJ=msflinker.o basic_libc.o syscall.o linker_format.o dlfcn.o zlib.o metsrv_rtld.o
-
-compiled=../../bionic/compiled
+compiled=../../../posix-meterp-build-tmp/compiled/
 
 # These are all generated from their .so counterparts below
-HEADERS=libc.h       \
-	libm.h           \
-	libcrypto.h      \
-	libssl.h         \
-	libsupport.h     \
-	libmetsrv_main.h \
-	libpcap.h
+LIBOBJECTS=libc.o       \
+	libpcap.o	\
+	libcrypto.o      \
+	libssl.o         \
+	libsupport.o     \
+	libmetsrv_main.o
 
-
-all: msflinker msflinker.bin rtldtest
+all: stage1
 
 debug: DEBUG=true
 debug: CFLAGS+=-ggdb
 debug: all
 
-%.h: $(compiled)/%.so
-	([ "$(DEBUG)" != "true" ] && strip --strip-debug $<) || true
-	(export SO=$<; perl ../../../tools/so2h.pl $< $$(basename $${SO%.so}))
+%.o: $(compiled)/%.so
+	[ -d tmp ] || mkdir tmp
+	cp $< tmp/$(*).tmp
+	([ "$(DEBUG)" != "true" ] && $(STRIP) --strip-debug tmp/$(*).tmp) || true
+	gzip -nfc < tmp/$(*).tmp >tmp/$(*).gz
+	$(OBJCOPY) -I binary -O elf32-big \
+		--redefine-sym _binary_tmp_$*_start=$*_start \
+		--redefine-sym _binary_tmp_$*_end=$*_end \
+		--redefine-sym _binary_tmp_$*_size=$*_size \
+		tmp/$(*).gz $(*).o
+	@echo "extern const char " $(*)"[];" > $(*).h
+	@echo "extern const char " $(*)"_end[];" >> $(*).h
+	@echo "extern const char " $(*)"_size_sym[];" >> $(*).h
+	@echo "#define $(*)_size ((int)$(*)_size_sym)" >> $(*).h
+	rm tmp/$(*).*
 
-msflinker: $(OBJ)
-	$(CC) -Wl,-script=script -Wl,--hash-style=sysv $(CFLAGS) -o msflinker $(OBJ) -lgcc
-	([ "$(DEBUG)" != "true" ] && strip $@) || true
-
-# elf2bin only has to run on the build machine, don't bother with CFLAGS
-msflinker.bin: msflinker elf2bin.c
-	$(CC) -march=i386 -m32 -o elf2bin elf2bin.c
-	./elf2bin msflinker msflinker.bin
-
-metsrv_rtld.o: $(HEADERS)
-
-rtldtest: rtldtest.c msflinker
-	$(CC) -march=i386 -m32 -o rtldtest rtldtest.c -DEP=`objdump -f msflinker | grep start | awk '{ print $$3 }'`
+stage1: $(LIBOBJECTS) $(OBJ)
 
 .S.o:
 	$(CC) $(CFLAGS) -c $<
@@ -52,10 +44,9 @@ rtldtest: rtldtest.c msflinker
 	$(CC) $(CFLAGS) -c $<
 
 clean:
-	rm -f $(HEADERS)
+	rm -f $(OBJECTS)
+	rm -f lib*.h
 	rm -f *.o
-	rm -f msflinker msflinker.bin msflinker.so
-	rm -f rtldtest elf2bin
 
 .PHONY: clean
 
