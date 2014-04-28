@@ -33,6 +33,7 @@ debug: all
 	@echo "extern const char " $(*)"_end[];" >> $(*).h
 	@echo "extern const char " $(*)"_size_sym[];" >> $(*).h
 	@echo "#define $(*)_size ((int)$(*)_size_sym)" >> $(*).h
+	@echo "#define $(*)_raw `stat -c'%s' tmp/$(*).gz` // decompressed size" >> $(*).h
 	rm tmp/$(*).*
 
 stage1: $(LIBOBJECTS) $(OBJ)
