@@ -19,21 +19,25 @@ debug: DEBUG=true
 debug: CFLAGS+=-ggdb
 debug: all
 
-%.o: $(compiled)/%.so
+gzip2raw: gzip2raw.c
+	gcc -Wall -ggdb -O2 gzip2raw.c -o gzip2raw
+
+%.o: gzip2raw $(compiled)/%.so
 	[ -d tmp ] || mkdir tmp
 	cp $< tmp/$(*).tmp
 	([ "$(DEBUG)" != "true" ] && $(STRIP) --strip-debug tmp/$(*).tmp) || true
-	gzip -nfc < tmp/$(*).tmp >tmp/$(*).gz
-	$(OBJCOPY) -I binary -O elf32-big \
-		--redefine-sym _binary_tmp_$*_start=$*_start \
-		--redefine-sym _binary_tmp_$*_end=$*_end \
-		--redefine-sym _binary_tmp_$*_size=$*_size \
-		tmp/$(*).gz $(*).o
-	@echo "extern const char " $(*)"[];" > $(*).h
-	@echo "extern const char " $(*)"_end[];" >> $(*).h
-	@echo "extern const char " $(*)"_size_sym[];" >> $(*).h
-	@echo "#define $(*)_size ((int)$(*)_size_sym)" >> $(*).h
-	@echo "#define $(*)_raw `stat -c'%s' tmp/$(*).gz` // decompressed size" >> $(*).h
+	gzip -9nfc < tmp/$(*).tmp >tmp/$(*).gz
+	./gzip2raw tmp/$(*).gz tmp/$(*).raw
+	$(OBJCOPY) -I binary -O elf32-tradbigmips \
+		--binary-architecture=mips \
+		--redefine-sym _binary_tmp_$*_raw_start=$*_start \
+		--redefine-sym _binary_tmp_$*_raw_end=$*_end \
+		--redefine-sym _binary_tmp_$*_raw_size=$*_size \
+		tmp/$(*).raw $(*).o
+	@echo "extern int " $(*)"_start;" > $(*).h
+	@echo "extern int " $(*)"_end;" >> $(*).h
+	@echo "extern int " $(*)"_size;" >> $(*).h
+	@echo "#define $(*)_raw (`stat -c'%s' tmp/$(*).raw`)" >> $(*).h
 	rm tmp/$(*).*
 
 stage1: $(LIBOBJECTS) $(OBJ)

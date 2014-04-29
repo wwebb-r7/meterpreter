@@ -1,0 +1,21 @@
+                                  Stage 0 for loading meterpreter is the
+        /=================\       shellcode requesting the meterpreter 
+       /                   \      payload, and allocating the memory for 
+      / METERPRETER WORKING \     stage 1 code, and handing execution off 
+     /=======================\    to the stage 1 code.
+    |                         |   
+    |        STAGE 3          |   The stage 1 code acts to bootstrap the libc
+    |                         |   environment by decompressing the various
+   /===========================\  libraries required, setting up stacks, and
+   |                           |  environment (such as AUXV handling) and then
+   |         STAGE 2           |  handing execution off to the libc entry point.
+   |                           |  
+  /=============================\ Stage 2 is the libc code getting itself ready
+  |                             | by performing libc related initialization,
+  |          STAGE 1            | and then other misc. initialization (such as
+  |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~| processing AT_PHDR / etc. stuff). Stage2 then
+  |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~| calls the entry point of the stage 3 binary.
+  | | | | | | | | | | | | | | | | 
+  | | | | | | | | | | | | | | | | Stage 3 deals with getting meterpreter itself 
+  ',. , . , . , . , . , . , . ,.` up and running, with ..
+
