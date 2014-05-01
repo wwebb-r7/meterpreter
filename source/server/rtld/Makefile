@@ -1,5 +1,5 @@
 
-CFLAGS=-fPIC -DPIC
+CFLAGS=-fPIC -DPIC -Wall -ggdb 
 
 OBJ=zlib.o
 
@@ -22,7 +22,7 @@ debug: all
 gzip2raw: gzip2raw.c
 	gcc -Wall -ggdb -O2 gzip2raw.c -o gzip2raw
 
-%.o: gzip2raw $(compiled)/%.so
+%.o: $(compiled)/%.so
 	[ -d tmp ] || mkdir tmp
 	cp $< tmp/$(*).tmp
 	([ "$(DEBUG)" != "true" ] && $(STRIP) --strip-debug tmp/$(*).tmp) || true
@@ -38,9 +38,11 @@ gzip2raw: gzip2raw.c
 	@echo "extern int " $(*)"_end;" >> $(*).h
 	@echo "extern int " $(*)"_size;" >> $(*).h
 	@echo "#define $(*)_raw (`stat -c'%s' tmp/$(*).raw`)" >> $(*).h
+	exit 1
 	rm tmp/$(*).*
 
-stage1: $(LIBOBJECTS) $(OBJ)
+stage1: gzip2raw $(LIBOBJECTS) $(OBJ) stage1.o
+	$(CC) -Wall -ggdb stage1.o $(LIBOBJECTS) $(OBJ) -o stage1
 
 .S.o:
 	$(CC) $(CFLAGS) -c $<
