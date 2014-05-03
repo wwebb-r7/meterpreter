@@ -37,8 +37,7 @@ gzip2raw: gzip2raw.c
 	@echo "extern int " $(*)"_start;" > $(*).h
 	@echo "extern int " $(*)"_end;" >> $(*).h
 	@echo "extern int " $(*)"_size;" >> $(*).h
-	@echo "#define $(*)_raw (`stat -c'%s' tmp/$(*).raw`)" >> $(*).h
-	exit 1
+	@echo "#define $(*)_raw (`stat -c'%s' tmp/$(*).tmp`)" >> $(*).h
 	rm tmp/$(*).*
 
 stage1: gzip2raw $(LIBOBJECTS) $(OBJ) stage1.o
