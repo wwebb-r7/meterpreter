@@ -13,7 +13,7 @@ LIBOBJECTS=libc.o       \
 	libsupport.o     \
 	libmetsrv_main.o
 
-all: stage1
+all: stage3 stage1
 
 debug: DEBUG=true
 debug: CFLAGS+=-ggdb
@@ -21,6 +21,22 @@ debug: all
 
 gzip2raw: gzip2raw.c
 	gcc -Wall -ggdb -O2 gzip2raw.c -o gzip2raw
+
+stage3: gzip2raw
+	$(CC) -Wall -ggdb -O2 -o stage3 stage3.c
+	gzip -9nfc < stage3 >stage3.gz
+	./gzip2raw stage3.gz stage3.raw
+	$(OBJCOPY) -I binary -O elf32-tradbigmips \
+		--binary-architecture=mips \
+		--redefine-sym _binary_stage3_raw_start=stage3_start \
+		--redefine-sym _binary_stage3_raw_end=stage3_end \
+		--redefine-sym _binary_stage3_raw_size=stage3_size \
+		stage3.raw stage3.o
+	@echo "extern int " stage3"_start;" > stage3.h
+	@echo "extern int " stage3"_end;" >> stage3.h
+	@echo "extern int " stage3"_size;" >> stage3.h
+	@echo "#define stage3_raw (`stat -c'%s' stage3`)" >> stage3.h
+	rm stage3.raw stage3.gz
 
 %.o: $(compiled)/%.so
 	[ -d tmp ] || mkdir tmp
@@ -40,8 +56,8 @@ gzip2raw: gzip2raw.c
 	@echo "#define $(*)_raw (`stat -c'%s' tmp/$(*).tmp`)" >> $(*).h
 	rm tmp/$(*).*
 
-stage1: gzip2raw $(LIBOBJECTS) $(OBJ) stage1.o
-	$(CC) -Wall -ggdb stage1.o $(LIBOBJECTS) $(OBJ) -o stage1
+stage1: $(LIBOBJECTS) $(OBJ) stage1.o stage3.o
+	$(CC) -Wall -ggdb -static stage1.o stage3.o $(LIBOBJECTS) $(OBJ) -o stage1
 
 .S.o:
 	$(CC) $(CFLAGS) -c $<
