@@ -23,7 +23,7 @@ gzip2raw: gzip2raw.c
 	gcc -Wall -ggdb -O2 gzip2raw.c -o gzip2raw
 
 stage3: gzip2raw
-	$(CC) -Wall -ggdb -O2 -o stage3 stage3.c
+	$(CC) -Wall -ggdb -O2 -pie -fPIC -o stage3 stage3.c
 	gzip -9nfc < stage3 >stage3.gz
 	./gzip2raw stage3.gz stage3.raw
 	$(OBJCOPY) -I binary -O elf32-tradbigmips \
@@ -57,7 +57,7 @@ stage3: gzip2raw
 	rm tmp/$(*).*
 
 stage1: $(LIBOBJECTS) $(OBJ) stage1.o stage3.o
-	$(CC) -Wall -ggdb -static stage1.o stage3.o $(LIBOBJECTS) $(OBJ) -o stage1
+	$(CC) -Os -Wall -ggdb -static stage1.o stage3.o $(LIBOBJECTS) $(OBJ) -o stage1
 
 .S.o:
 	$(CC) $(CFLAGS) -c $<
