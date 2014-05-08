@@ -30,6 +30,7 @@ void cleanup_fd();
 int load_blob(unsigned char *start, unsigned int size, unsigned int raw_size, blob_t *blob);
 int load_elf_blob(loader_t *loader, blob_t *blob_in, blob_t *blob_out);
 void free_blob(blob_t *blob);
+void and_jump(blob_t *stack_blob, blob_t *libc_blob);
 
 inline int loader_alloc(loader_t *loader, size_t sz);
 
@@ -84,30 +85,59 @@ int main(int argc, char **argv)
 	load_elf_blob(&loader, &stage3_blob, &loaded_stage3_blob);
 	free_blob(&stage3_blob);
 
-	setup_stack(&stack_blob, &loaded_libc_blob, &stage3_blob);
+	setup_stack(&stack_blob, &loaded_libc_blob, &loaded_stage3_blob);
+	and_jump(&stack_blob, &loaded_libc_blob);
 
 	return 0;
 }
 
+void and_jump(blob_t *stack_blob, blob_t *libc_blob)
+{
+	Elf32_Ehdr *ehdr;
+
+	register int (*entry)() asm("t9");
+	register int *(*sp) asm("sp");
+	// Where does Napolean keep his armies? In his sleevies.
+
+	ehdr = (Elf32_Ehdr *)(libc_blob->blob);
+	entry = libc_blob->blob + ehdr->e_entry;
+	sp = stack_blob->blob;
+
+	entry();
+
+	printf("hmmm. And libc returned back to us :/\n"); fflush(stdout);
+	crash();
+}
+
 int setup_stack(blob_t *stack, blob_t *libc, blob_t *stage3)
 {
-	unsigned int *ptr;
+	unsigned int *ptr, *argv, *envp;
+	unsigned char *p;
 	Elf32_Ehdr *ehdr;
 	Elf32_Phdr *phdr;
+	int x;
 
-	ehdr = (Elf32_Ehdr *)(stage3->blob;
+	printf("--> setup_stack %p, %p, %p\n", stack, libc, stage3); fflush(stdout);
+	printf("--> libc->blob = %p\n", libc->blob);
+	printf("--> stage3->blob = %p\n", stage3->blob);
+
+	ehdr = (Elf32_Ehdr *)(stage3->blob);
 	phdr = (Elf32_Phdr *)(stage3->blob + ehdr->e_phoff);
 
-	stack->blob += (STACK_SIZE - 2048);
+	stack->blob += (STACK_SIZE - 4096);
 	ptr = (unsigned int *)(stack->blob);
 
-	*ptr++ = 0; // return address
+	// *ptr++ = 0; // return address
 	*ptr++ = 1; // argc
-	*ptr++ = NULL; // argv[0]
-	*ptr++ = NULL; // argv[1]
-	*ptr++ = NULL; // envp
+	argv = ptr;
+	ptr++;
+	*ptr++ = 0; // null terminate
+	envp = ptr;
+	ptr ++;
+	*ptr++ = 0;
+	// *ptr++ = 0; // padding?
 
-#define set_auxv(key, value) do { *ptr++ = key; *ptr++ = value; } while(0)
+#define set_auxv(key, value) do { *ptr++ = (unsigned int)(key); *ptr++ = (unsigned int)(value); } while(0)
 	set_auxv(AT_UID, 0);
 	set_auxv(AT_EUID, 0);
 	set_auxv(AT_GID, 0);
@@ -119,17 +149,26 @@ int setup_stack(blob_t *stack, blob_t *libc, blob_t *stage3)
 	// set up elf structures ..
 	set_auxv(AT_PHDR, phdr);
 	set_auxv(AT_PHNUM, ehdr->e_phnum);
-	set_auxv(AT_PHENT, ehdr->e_phent_size);
-	set_auxv(AT_RANDOM, ptr + 3);
+	set_auxv(AT_PHENT, ehdr->e_phentsize);
+	set_auxv(AT_RANDOM, ptr + 5);
+	set_auxv(AT_ENTRY, stage3->blob + ehdr->e_entry);
 	set_auxv(AT_NULL, 0);
+	set_auxv(0, 0);
 	// set up "random" values
 	set_auxv(0xabad1dea, 0xdefac8ed);
 	set_auxv(0xcafed00d, 0xc0ffee);
+	set_auxv(0xabad1dea, 0xdefac8ed);
+	set_auxv(0, 0);
 
 #undef set_auxv
 
-
-
+	p = (unsigned char *)(ptr);
+	*argv = (unsigned int)(ptr);
+	strcpy(p, "argv0");
+	p += 6;
+	*envp = (unsigned int)(p);
+	strcpy(p, "envp0");
+	p += 6;
 }
 
 /*
@@ -379,5 +418,5 @@ void free_blob(blob_t *blob)
 	if(blob->length) {
 		munmap(blob->blob, blob->alloc_size);
 	}
-	memset(blob, 0, sizeof(blob_t));
+	memset(blob, 0xcd, sizeof(blob_t));
 }
