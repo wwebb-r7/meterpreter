@@ -22,8 +22,27 @@ debug: all
 gzip2raw: gzip2raw.c
 	gcc -Wall -ggdb -O2 gzip2raw.c -o gzip2raw
 
+vdso: gzip2raw vdso.c
+	$(CC) -Wall -ggdb -O2 -shared -fPIC -o vdso.so vdso.c
+	# ([ "$(DEBUG)" != "true" ] && $(STRIP) --strip-debug vdso.so) || true
+	gzip -9nfc < vdso.so >vdso.gz
+	./gzip2raw vdso.gz vdso.raw
+	$(OBJCOPY) -I binary -O elf32-tradbigmips \
+		--binary-architecture=mips \
+		--redefine-sym _binary_vdso_raw_start=vdso_start \
+		--redefine-sym _binary_vdso_raw_end=vdso_end \
+		--redefine-sym _binary_vdso_raw_size=vdso_size \
+		vdso.raw vdso.o
+	@echo "extern int " vdso"_start;" > vdso.h
+	@echo "extern int " vdso"_end;" >> vdso.h
+	@echo "extern int " vdso"_size;" >> vdso.h
+	@echo "#define vdso_raw (`stat -c'%s' vdso.so`)" >> vdso.h
+	rm vdso.raw vdso.gz
+
+
 stage3: gzip2raw
 	$(CC) -Wall -ggdb -O2 -pie -fPIC -o stage3 stage3.c
+	([ "$(DEBUG)" != "true" ] && $(STRIP) --strip-debug stage3) || true
 	gzip -9nfc < stage3 >stage3.gz
 	./gzip2raw stage3.gz stage3.raw
 	$(OBJCOPY) -I binary -O elf32-tradbigmips \
@@ -56,8 +75,8 @@ stage3: gzip2raw
 	@echo "#define $(*)_raw (`stat -c'%s' tmp/$(*).tmp`)" >> $(*).h
 	rm tmp/$(*).*
 
-stage1: $(LIBOBJECTS) $(OBJ) stage1.o stage3.o
-	$(CC) -Os -Wall -ggdb -static stage1.o stage3.o $(LIBOBJECTS) $(OBJ) -o stage1
+stage1: $(LIBOBJECTS) $(OBJ) stage1.c stage1.o stage3.o vdso.o
+	$(CC) -Os -Wall -ggdb stage1.o stage3.o vdso.o $(LIBOBJECTS) $(OBJ) -o stage1
 
 .S.o:
 	$(CC) $(CFLAGS) -c $<

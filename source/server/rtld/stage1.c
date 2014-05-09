@@ -12,6 +12,7 @@
 #include "libc.h"
 #include "zlib.h"
 #include "stage3.h"
+#include "vdso.h"
 
 typedef struct loader {
 	unsigned char *base;
@@ -34,10 +35,22 @@ void and_jump(blob_t *stack_blob, blob_t *libc_blob);
 
 inline int loader_alloc(loader_t *loader, size_t sz);
 
+int setup_stack(blob_t *stack, blob_t *libc, blob_t *stage3, blob_t *vdso);
+
 #define STACK_SIZE (1024 * 1024)
-#define PADDING (3 * 4096) // spare pages for PROT_NONE, etc.
+
+// Allocate some spare pages for padding issues.
+// Seems like MIPS is a PITA due to the phdr->p_align being 2**16,
+// causing a lot of wasted memory :|
+
+#define PADDING (128 * 4096) 
 
 #define crash() do { *((unsigned char *)NULL) = 0; } while(0)
+
+#define ROUNDUP(x, y)   ((((x)+((y)-1))/(y))*(y))
+#define	ALIGNDOWN(k, v)	((unsigned int)(k)&(~((unsigned int)(v)-1)))
+#define ALIGN(k, v)     (((k)+((v)-1))&(~((v)-1)))
+
 
 int main(int argc, char **argv)
 {
@@ -45,10 +58,11 @@ int main(int argc, char **argv)
 	blob_t libc_blob;
 	blob_t stage3_blob;
 	blob_t stack_blob;
+	blob_t vdso_blob;
 
 	blob_t loaded_libc_blob;
 	blob_t loaded_stage3_blob;
-
+	blob_t loaded_vdso_blob;
 	/*
 	 * At this point, we're executing on an unknown stack, with an unknown
 	 * stack size, so let's try to keep things as a minimum
@@ -60,7 +74,7 @@ int main(int argc, char **argv)
 	reset_signal_handlers();
 	cleanup_fd();
 
-	if(loader_alloc(&loader, libc_raw + stage3_raw + STACK_SIZE + PADDING) != 0) {
+	if(loader_alloc(&loader, libc_raw + stage3_raw + vdso_raw + STACK_SIZE + PADDING) != 0) {
 		printf("loader_alloc failed!\n"); fflush(stdout);
 		crash();
 	}
@@ -85,7 +99,14 @@ int main(int argc, char **argv)
 	load_elf_blob(&loader, &stage3_blob, &loaded_stage3_blob);
 	free_blob(&stage3_blob);
 
-	setup_stack(&stack_blob, &loaded_libc_blob, &loaded_stage3_blob);
+	load_blob((unsigned char *)&vdso_start, (int) &vdso_size, vdso_raw, &vdso_blob);
+	load_elf_blob(&loader, &vdso_blob, &loaded_vdso_blob);
+	free_blob(&vdso_blob);
+
+	setup_stack(&stack_blob, &loaded_libc_blob, &loaded_stage3_blob, &loaded_vdso_blob);
+
+	printf("--> ENTERING POINT OF NO RETURN <--\n");
+
 	and_jump(&stack_blob, &loaded_libc_blob);
 
 	return 0;
@@ -109,13 +130,12 @@ void and_jump(blob_t *stack_blob, blob_t *libc_blob)
 	crash();
 }
 
-int setup_stack(blob_t *stack, blob_t *libc, blob_t *stage3)
+int setup_stack(blob_t *stack, blob_t *libc, blob_t *stage3, blob_t *vdso)
 {
 	unsigned int *ptr, *argv, *envp;
 	unsigned char *p;
 	Elf32_Ehdr *ehdr;
 	Elf32_Phdr *phdr;
-	int x;
 
 	printf("--> setup_stack %p, %p, %p\n", stack, libc, stage3); fflush(stdout);
 	printf("--> libc->blob = %p\n", libc->blob);
@@ -135,7 +155,6 @@ int setup_stack(blob_t *stack, blob_t *libc, blob_t *stage3)
 	envp = ptr;
 	ptr ++;
 	*ptr++ = 0;
-	// *ptr++ = 0; // padding?
 
 #define set_auxv(key, value) do { *ptr++ = (unsigned int)(key); *ptr++ = (unsigned int)(value); } while(0)
 	set_auxv(AT_UID, 0);
@@ -152,7 +171,9 @@ int setup_stack(blob_t *stack, blob_t *libc, blob_t *stage3)
 	set_auxv(AT_PHENT, ehdr->e_phentsize);
 	set_auxv(AT_RANDOM, ptr + 5);
 	set_auxv(AT_ENTRY, stage3->blob + ehdr->e_entry);
+	set_auxv(AT_SYSINFO_EHDR, vdso->blob);
 	set_auxv(AT_NULL, 0);
+
 	set_auxv(0, 0);
 	// set up "random" values
 	set_auxv(0xabad1dea, 0xdefac8ed);
@@ -169,6 +190,8 @@ int setup_stack(blob_t *stack, blob_t *libc, blob_t *stage3)
 	*envp = (unsigned int)(p);
 	strcpy(p, "envp0");
 	p += 6;
+
+	return 0;
 }
 
 /*
@@ -269,7 +292,7 @@ void *zalloc(void *opaque, unsigned int count, unsigned int size)
 		// in order to ask for more memory at the same address.
 		// However, I'll add that in if needed. 
 
-		printf("requested a %d bytes, only %d bytes remaining\n", wanted, (int)(za->next) - (int)(za->base));
+		printf("requested a %d bytes, only %d bytes remaining\n", wanted, za->len - ((int)(za->next) - (int)(za->base)));
 		fflush(stdout);
 		crash();
 
@@ -319,7 +342,8 @@ int load_blob(unsigned char *start, unsigned int size, unsigned int raw_size, bl
 	memset(&stream, 0, sizeof(z_stream));
 	memset(blob, 0, sizeof(blob_t));
 
-	// raw_size/8 gives about ~14k spare for libc.o loading.
+	// raw_size/8 gives about ~14k spare for libc.o loading. Combined with 
+	// ability to recover one allocation, it jumps up to ~29k left over.
 	init_zliballoc(&za, raw_size/8);
 
 	blob->alloc_size = (raw_size + 4095) & ~4095;
@@ -378,7 +402,7 @@ int load_elf_blob(loader_t *loader, blob_t *blob_in, blob_t *blob_out)
 	Elf32_Ehdr *ehdr;
 	Elf32_Phdr *phdr;
 	int i;
-	size_t filesz, memsz, offsz;
+	size_t filesz, memsz;
 
 	ehdr = (Elf32_Ehdr *)blob_in->blob;
 	phdr = (Elf32_Phdr *)(blob_in->blob + ehdr->e_phoff);
@@ -392,19 +416,46 @@ int load_elf_blob(loader_t *loader, blob_t *blob_in, blob_t *blob_out)
 	 */
 
 	memset(blob_out, 0, sizeof(blob_t));
-	blob_out->blob = loader->next;
+	// blob_out->blob = loader->next; // XXX
 
 	printf("ehdr is at %p, and phdr is at %p\n", ehdr, phdr);
 	for(i = 0; i < ehdr->e_phnum; i++, phdr++) {
+		unsigned char *dst, *src;
 		if(phdr->p_type != PT_LOAD) continue;
+
+		if(! blob_out->blob) {
+			size_t diff;
+
+			blob_out->blob = (unsigned char *) ALIGN((size_t)(loader->next), (phdr->p_align));
+			diff = (size_t)(blob_out->blob) - (size_t)(loader->next);
+			loader->next += diff;
+			// blob_out->blob = loader->next + diff;
+
+			printf("Lost %d bytes due to page alignment :/\n", diff);
+		}
+
+		// map_addr = (void *)ALIGNDOWN(p->p_vaddr, p->p_align);
 
 		printf("Found a PT_LOAD segment at %d\n", i);
 
-		offsz = phdr->p_vaddr & ~4095;
-		filesz = phdr->p_filesz + (phdr->p_vaddr & 4095);
-		memsz = ((phdr->p_memsz + (phdr->p_vaddr & 4095)) + 4095) & ~4095;
+		//offsz = phdr->p_vaddr & ~4095;
+		filesz = phdr->p_filesz; // + (phdr->p_vaddr & 4095);
+		// memsz = ((phdr->p_memsz + (phdr->p_vaddr & 4095)) + 4095) & ~4095;
+		memsz = ROUNDUP(phdr->p_memsz, phdr->p_align);
 
-		memcpy(blob_out->blob + offsz, blob_in->blob + (phdr->p_offset & ~4095), filesz);
+		if(filesz > memsz) {
+			printf("Something is rotten in the state of Denmark\n");
+			crash();
+		}
+
+		//dst = blob_out->blob + offsz;
+		dst = blob_out->blob + phdr->p_vaddr;
+		src = blob_in->blob + phdr->p_offset; // (phdr->p_offset & ~4096);
+	
+		printf("  memcpy(0x%08x, 0x%08x, %d)\n", dst, src, filesz);
+
+		//memcpy(blob_out->blob + offsz, blob_in->blob + (phdr->p_offset & ~4095), filesz);
+		memcpy(dst, src, filesz);
 
 		loader->next += memsz;
 		blob_out->length += memsz;
