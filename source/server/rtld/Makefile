@@ -22,25 +22,7 @@ debug: all
 gzip2raw: gzip2raw.c
 	gcc -Wall -ggdb -O2 gzip2raw.c -o gzip2raw
 
-vdso: gzip2raw vdso.c
-	$(CC) -Wall -ggdb -O2 -shared -fPIC -o vdso.so vdso.c
-	# ([ "$(DEBUG)" != "true" ] && $(STRIP) --strip-debug vdso.so) || true
-	gzip -9nfc < vdso.so >vdso.gz
-	./gzip2raw vdso.gz vdso.raw
-	$(OBJCOPY) -I binary -O elf32-tradbigmips \
-		--binary-architecture=mips \
-		--redefine-sym _binary_vdso_raw_start=vdso_start \
-		--redefine-sym _binary_vdso_raw_end=vdso_end \
-		--redefine-sym _binary_vdso_raw_size=vdso_size \
-		vdso.raw vdso.o
-	@echo "extern int " vdso"_start;" > vdso.h
-	@echo "extern int " vdso"_end;" >> vdso.h
-	@echo "extern int " vdso"_size;" >> vdso.h
-	@echo "#define vdso_raw (`stat -c'%s' vdso.so`)" >> vdso.h
-	rm vdso.raw vdso.gz
-
-
-stage3: gzip2raw
+stage3: gzip2raw stage3.c
 	$(CC) -Wall -ggdb -O2 -pie -fPIC -o stage3 stage3.c
 	([ "$(DEBUG)" != "true" ] && $(STRIP) --strip-debug stage3) || true
 	gzip -9nfc < stage3 >stage3.gz
@@ -55,6 +37,9 @@ stage3: gzip2raw
 	@echo "extern int " stage3"_end;" >> stage3.h
 	@echo "extern int " stage3"_size;" >> stage3.h
 	@echo "#define stage3_raw (`stat -c'%s' stage3`)" >> stage3.h
+	@echo "#define stage3_trap_handler_offset (0x`objdump -t stage3 | egrep text.*trap_handler | cut -d' ' -f1 `)" >> stage3.h
+	@echo "#define stage3_detours_offset (0x`objdump -t stage3 | egrep bss.*detours | cut -d' ' -f1 `)" >> stage3.h
+	@echo "#define stage3_libraries_offset (0x`objdump -t stage3 | egrep bss.*libraries | cut -d' ' -f1 `)" >> stage3.h
 	rm stage3.raw stage3.gz
 
 %.o: $(compiled)/%.so
@@ -75,8 +60,23 @@ stage3: gzip2raw
 	@echo "#define $(*)_raw (`stat -c'%s' tmp/$(*).tmp`)" >> $(*).h
 	rm tmp/$(*).*
 
-stage1: $(LIBOBJECTS) $(OBJ) stage1.c stage1.o stage3.o vdso.o
-	$(CC) -Os -Wall -ggdb stage1.o stage3.o vdso.o $(LIBOBJECTS) $(OBJ) -o stage1
+libc_offsets.h: libc.o
+	@echo > libc_offsets.h
+	#objdump -t $(compiled)/libc.so | egrep "text.* (open|close|fstat|mmap)(64)?$" | sed -r 's/\s+/ /g' | cut -d' ' -f 1,6 | while read off name ; do
+	# echo "#define libc_${name}_offset (0x${offset})" >> libc_offsets.h \
+	# done
+	echo "#define libc_open_offset (0x`objdump -t $(compiled)/libc.so | egrep 'text.* open$$' | cut -d' ' -f 1`)" >> libc_offsets.h
+	echo "#define libc_close_offset (0x`objdump -t $(compiled)/libc.so | egrep 'text.* close$$' | cut -d' ' -f 1`)" >> libc_offsets.h
+	echo "#define libc_mmap_offset (0x`objdump -t $(compiled)/libc.so | egrep 'text.* mmap$$' | cut -d' ' -f 1`)" >> libc_offsets.h
+	echo "#define libc_fstat_offset (0x`objdump -t $(compiled)/libc.so | egrep 'text.* fstat64$$' | cut -d' ' -f 1`)" >> libc_offsets.h
+	echo "#define libc_read_offset (0x`objdump -t $(compiled)/libc.so | egrep 'text.* read$$' | cut -d' ' -f 1`)" >> libc_offsets.h
+	echo "#define libc_pread_offset (0x`objdump -t $(compiled)/libc.so | egrep 'text.* pread$$' | cut -d' ' -f 1`)" >> libc_offsets.h
+
+
+
+
+stage1: $(LIBOBJECTS) $(OBJ) stage1.c stage1.o stage3.o libc_offsets.h
+	$(CC) -static -Os -Wall -ggdb stage1.o stage3.o $(LIBOBJECTS) $(OBJ) -o stage1
 
 .S.o:
 	$(CC) $(CFLAGS) -c $<

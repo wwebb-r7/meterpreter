@@ -8,11 +8,14 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <elf.h>
+#include <signal.h>
 
 #include "libc.h"
 #include "zlib.h"
 #include "stage3.h"
-#include "vdso.h"
+#include "libpcap.h"
+
+#include "libc_offsets.h"
 
 typedef struct loader {
 	unsigned char *base;
@@ -35,7 +38,9 @@ void and_jump(blob_t *stack_blob, blob_t *libc_blob);
 
 inline int loader_alloc(loader_t *loader, size_t sz);
 
-int setup_stack(blob_t *stack, blob_t *libc, blob_t *stage3, blob_t *vdso);
+int setup_stack(blob_t *stack, blob_t *libc, blob_t *stage3);
+int setup_detours(blob_t *libc, blob_t *stage3);
+int add_library(blob_t *stage3, char *name, blob_t *library);
 
 #define STACK_SIZE (1024 * 1024)
 
@@ -58,11 +63,12 @@ int main(int argc, char **argv)
 	blob_t libc_blob;
 	blob_t stage3_blob;
 	blob_t stack_blob;
-	blob_t vdso_blob;
+	blob_t libpcap_blob;
 
 	blob_t loaded_libc_blob;
 	blob_t loaded_stage3_blob;
-	blob_t loaded_vdso_blob;
+	blob_t loaded_libpcap_blob;
+
 	/*
 	 * At this point, we're executing on an unknown stack, with an unknown
 	 * stack size, so let's try to keep things as a minimum
@@ -74,7 +80,7 @@ int main(int argc, char **argv)
 	reset_signal_handlers();
 	cleanup_fd();
 
-	if(loader_alloc(&loader, libc_raw + stage3_raw + vdso_raw + STACK_SIZE + PADDING) != 0) {
+	if(loader_alloc(&loader, libc_raw + stage3_raw + libpcap_raw + STACK_SIZE + PADDING) != 0) {
 		printf("loader_alloc failed!\n"); fflush(stdout);
 		crash();
 	}
@@ -90,25 +96,106 @@ int main(int argc, char **argv)
 
 	// set up stack allocation.
 
-	printf("blob() .. %08x, %08x, %08x\n", &libc_start, &libc_size, libc_raw); fflush(stdout);
+	printf("loading libc.so\n"); fflush(stdout);
 	load_blob((unsigned char *)&libc_start, (int) &libc_size, libc_raw, &libc_blob);
 	load_elf_blob(&loader, &libc_blob, &loaded_libc_blob);
 	free_blob(&libc_blob);
 
+	printf("loading stage3\n"); fflush(stdout);
 	load_blob((unsigned char *)&stage3_start, (int) &stage3_size, stage3_raw, &stage3_blob);
 	load_elf_blob(&loader, &stage3_blob, &loaded_stage3_blob);
 	free_blob(&stage3_blob);
 
-	load_blob((unsigned char *)&vdso_start, (int) &vdso_size, vdso_raw, &vdso_blob);
-	load_elf_blob(&loader, &vdso_blob, &loaded_vdso_blob);
-	free_blob(&vdso_blob);
+	printf("loading libpcap\n"); fflush(stdout);
+	load_blob((unsigned char *)&libpcap_start, (int) &libpcap_size, libpcap_raw, &libpcap_blob);
+	load_elf_blob(&loader, &libpcap_blob, &loaded_libpcap_blob);
+	free_blob(&libpcap_blob);
 
-	setup_stack(&stack_blob, &loaded_libc_blob, &loaded_stage3_blob, &loaded_vdso_blob);
+	printf("loaded_libpcap_blob() blob is %08x\n", loaded_libpcap_blob.blob);
+
+	setup_stack(&stack_blob, &loaded_libc_blob, &loaded_stage3_blob); 
+	setup_detours(&loaded_libc_blob, &loaded_stage3_blob);
+
+	add_library(&loaded_stage3_blob, "/nx/libpcap.so", &loaded_libpcap_blob);
 
 	printf("--> ENTERING POINT OF NO RETURN <--\n");
 
 	and_jump(&stack_blob, &loaded_libc_blob);
 
+	return 0;
+}
+
+// must be in sync with stage3.c ..
+struct libraries {
+	char name[32];
+	void *first_mmap;
+	void *second_mmap;
+};
+
+
+int add_library(blob_t *stage3, char *name, blob_t *library)
+{
+	static struct libraries *library_ptr;
+
+	if(library_ptr == NULL) {
+		library_ptr = (struct libraries *)(stage3->blob + stage3_libraries_offset);
+	}
+
+	if(strlen(name) > 31) crash();
+	strcpy(library_ptr->name, name);
+	library_ptr->first_mmap = library->blob;
+	
+	library_ptr++;
+
+	return 0;
+}
+
+
+int setup_detours(blob_t *libc, blob_t *stage3)
+{
+	struct sigaction sa;
+	unsigned int *fp;
+	unsigned int *detours;
+
+	memset(&sa, 0, sizeof(struct sigaction));
+
+	sa.sa_flags = SA_SIGINFO;
+	sa.sa_sigaction = (void *)(stage3->blob + stage3_trap_handler_offset);
+	sigaction(SIGTRAP, &sa, NULL);
+
+	detours = (unsigned int *)(stage3->blob + stage3_detours_offset);
+
+	fp = (unsigned int *)(libc->blob + libc_open_offset);  
+	*detours++ = (unsigned int)(fp);
+	*detours++ = *fp;
+	*fp = 0x0000000d;
+
+	fp = (unsigned int *)(libc->blob + libc_close_offset); 
+	*detours++ = (unsigned int)(fp);
+	*detours++ = *fp;
+	*fp = 0x0000000d;
+
+	fp = (unsigned int *)(libc->blob + libc_mmap_offset);
+	*detours++ = (unsigned int)(fp);
+	*detours++ = *fp;
+	*fp = 0x0000000d;
+
+	fp = (unsigned int *)(libc->blob + libc_fstat_offset);
+	*detours++ = (unsigned int)(fp);
+	*detours++ = *fp;
+	*fp = 0x0000000d;
+
+	fp = (unsigned int *)(libc->blob + libc_read_offset);
+	*detours++ = (unsigned int)(fp);
+	*detours++ = *fp;
+	*fp = 0x0000000d;
+
+	fp = (unsigned int *)(libc->blob + libc_pread_offset);
+	*detours++ = (unsigned int)(fp);
+	*detours++ = *fp;
+	*fp = 0x0000000d;
+
+	printf("detours setup\n");
 	return 0;
 }
 
@@ -121,8 +208,8 @@ void and_jump(blob_t *stack_blob, blob_t *libc_blob)
 	// Where does Napolean keep his armies? In his sleevies.
 
 	ehdr = (Elf32_Ehdr *)(libc_blob->blob);
-	entry = libc_blob->blob + ehdr->e_entry;
-	sp = stack_blob->blob;
+	entry = (Elf32_Ehdr *)(libc_blob->blob + ehdr->e_entry);
+	sp = (int *) stack_blob->blob;
 
 	entry();
 
@@ -130,9 +217,9 @@ void and_jump(blob_t *stack_blob, blob_t *libc_blob)
 	crash();
 }
 
-int setup_stack(blob_t *stack, blob_t *libc, blob_t *stage3, blob_t *vdso)
+int setup_stack(blob_t *stack, blob_t *libc, blob_t *stage3) 
 {
-	unsigned int *ptr, *argv, *envp;
+	unsigned int *ptr, *argv, *envp, *tmp;
 	unsigned char *p;
 	Elf32_Ehdr *ehdr;
 	Elf32_Phdr *phdr;
@@ -169,26 +256,24 @@ int setup_stack(blob_t *stack, blob_t *libc, blob_t *stage3, blob_t *vdso)
 	set_auxv(AT_PHDR, phdr);
 	set_auxv(AT_PHNUM, ehdr->e_phnum);
 	set_auxv(AT_PHENT, ehdr->e_phentsize);
-	set_auxv(AT_RANDOM, ptr + 5);
+	tmp = ptr;
+	set_auxv(AT_RANDOM, tmp + 6);
 	set_auxv(AT_ENTRY, stage3->blob + ehdr->e_entry);
-	set_auxv(AT_SYSINFO_EHDR, vdso->blob);
 	set_auxv(AT_NULL, 0);
 
-	set_auxv(0, 0);
 	// set up "random" values
 	set_auxv(0xabad1dea, 0xdefac8ed);
 	set_auxv(0xcafed00d, 0xc0ffee);
-	set_auxv(0xabad1dea, 0xdefac8ed);
 	set_auxv(0, 0);
 
 #undef set_auxv
 
 	p = (unsigned char *)(ptr);
 	*argv = (unsigned int)(ptr);
-	strcpy(p, "argv0");
+	strcpy((char *)p, "argv0");
 	p += 6;
 	*envp = (unsigned int)(p);
-	strcpy(p, "envp0");
+	strcpy((char *)p, "LD_LIBRARY_PATH=/nx");
 	p += 6;
 
 	return 0;
@@ -234,7 +319,7 @@ struct zliballoc {
 	unsigned char *prev;
 };
 
-#define MIN_HINT_SIZE (((32 * 2) + (32 / 2)) * 1024)
+#define MIN_HINT_SIZE (((32 * 5) * 1024))
 
 // Initialize the zliballoc structure
 int init_zliballoc(struct zliballoc *za, size_t hint)
@@ -243,9 +328,13 @@ int init_zliballoc(struct zliballoc *za, size_t hint)
 	memset(za, 0, sizeof(struct zliballoc));
 
 	if(hint < MIN_HINT_SIZE) {
+		//
 		// inflate requires a minimum of 32k for windowBits=15 plus
-		// a few kilobytes for small objects. since we don't free
-		// any allocations, let's 2.5 the size of that for lee way.
+		// a few kilobytes for small objects.
+		//
+		// it seems that libpcap.so being decompressed hits a 
+		// pathological case, and must be 32k * 5
+		//
 		requested = MIN_HINT_SIZE;
 	} else {
 		requested = (hint + 4095) & ~4095;
@@ -292,7 +381,7 @@ void *zalloc(void *opaque, unsigned int count, unsigned int size)
 		// in order to ask for more memory at the same address.
 		// However, I'll add that in if needed. 
 
-		printf("requested a %d bytes, only %d bytes remaining\n", wanted, za->len - ((int)(za->next) - (int)(za->base)));
+		printf("requested a %d byte allocation, only %d bytes remaining\n", wanted, za->len - ((int)(za->next) - (int)(za->base)));
 		fflush(stdout);
 		crash();
 
@@ -336,7 +425,7 @@ int load_blob(unsigned char *start, unsigned int size, unsigned int raw_size, bl
 	struct zliballoc za;
 	int status;
 
-	printf("in blob\n"); fflush(stdout);
+	// printf("in blob\n"); fflush(stdout);
 	// raw_size += 0;
 
 	memset(&stream, 0, sizeof(z_stream));
