@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <string.h>
+#include <time.h>
 
 #define _GNU_SOURCE
 #include <signal.h>
@@ -50,6 +51,8 @@ struct libraries {
 
 struct detours detours[HOOKED_FUNC_COUNT];
 struct libraries libraries[LIBRARY_COUNT];
+
+static int in_dlopen;
 
 static int fd_to_library_id(int fd)
 {
@@ -141,8 +144,25 @@ void *my_read(int *emul, int fd, void *buffer, size_t count)
 	printf("emulating read.. first_mmap is at 0x%08x\n", libraries[id].first_mmap); 
 	fflush(stdout);
 
-	*emul = 1;
+	if(memcmp(libraries[id].first_mmap, "\x7f\x45\x4c\x46", 4) != 0) {
+		char *p;
+		p = (unsigned char *)(libraries[id].first_mmap);
+
+		printf("%s is not an elf file, yet emulating a read for it?\n", libraries[id].name);
+		printf("first four bytes are %02x%02x%02x%02x\n",
+			p[0],
+			p[1],
+			p[2],
+			p[3]
+		);
+		fflush(stdout);
+		crash();
+	}
+
 	// XXX, does not implement a fd offset pointer thing.
+	// shouldn't matter, however.
+
+	*emul = 1;
 	memcpy(buffer, libraries[id].first_mmap, count);
 
 	return (void *)count;
@@ -179,7 +199,33 @@ void *my_mmap(int *emul, void *addr, size_t length, int prot, int flags, int fd,
 	); fflush(stdout);
 
 	id = fd_to_library_id(fd);
-	if(id == -1) return NULL;
+
+	if(id == -1) {
+		printf("in_dlopen is set to %d .. addr is %p\n", in_dlopen, addr);
+		if(in_dlopen && addr) {
+			unsigned char *x;
+			size_t cnt;
+
+			printf("dlopen wants to zerofill some memory. checking it's all 0\n"); fflush(stdout);
+
+			*emul = 1;
+			x = (unsigned char *)addr;
+			for(cnt = 0; cnt < length; cnt++) {
+				if(x[cnt] != 0) {
+					printf("offset %d has byte %02x\n", cnt, x[cnt]);
+					printf("actually it's %s if that helps :/\n", x + cnt);
+					fflush(stdout);
+					crash();
+				}
+			}
+			printf("nup, all good. clear to go!\n");
+			return addr;
+		}
+
+		return NULL;
+	}
+
+
 
 	printf("emulating %s mmap()..\n", addr ? "second" : "first"); fflush(stdout);
 	*emul = 1;
@@ -218,7 +264,21 @@ int platform_perform_return(mcontext_t *mctx)
 
 int platform_continue_execution(mcontext_t *mctx, int idx)
 {
-	crash();
+	int top, bottom;
+
+	top = (detours[idx].orig >> 16) & 0xffff;
+	bottom = (detours[idx].orig) & 0xffff;
+
+	if(top != 0x3c1c) {
+		printf("I don't know how to handle detour %d\n", idx);
+		crash();
+	}
+
+	// emulate lui gp modification
+	mctx->regs[28] = (bottom << 16);
+
+	mctx->pc += 4;
+
 	return 0;
 }
 
@@ -234,7 +294,7 @@ void trap_handler(int sig, siginfo_t *info, void *_ctx)
 	ret = NULL;
 	emulated = 0;
 
-#if 1
+#if 0
 	printf("PC is %08x\n", mctx->pc);
 	for(i = 0; i < 32; i++) {
 		printf("reg[%d] is %016llx, fpreg[%d] is %016llx\n", i, mctx->regs[i], i, mctx->fpregs[i]);
@@ -318,19 +378,40 @@ void trap_handler(int sig, siginfo_t *info, void *_ctx)
 	
 }
 
+void load_dependencies()
+{
+	void *x;
+	char *dependencies[] = { "libpcap.so", "libcrypto.so.1.0.0", "libssl.so.1.0.0", NULL };
+	int i;
+
+	in_dlopen = 1;
+
+	for(i = 0; dependencies[i]; i++) {
+		printf("performing a dlopen on %s\n", dependencies[i]);
+		fflush(stdout);
+
+		x = dlopen(dependencies[i], RTLD_NOW);
+		if(! x) {
+			printf("Failure to dlopen(\"%s\"): %s\n", dependencies[i], dlerror()); 
+			fflush(stdout);
+			exit(EXIT_FAILURE);
+		}
+
+		printf("%s has been loaded at %p\n", dependencies[i], x);
+	}
+
+	in_dlopen = 0;
+}
+
+#include <sys/mman.h>
+
 int main(int argc, char **argv)
 {
 	void *x;
-	void *y;
-	printf("dlopen start\n");
-	x = dlopen("libpcap.so", RTLD_NOW);
-	if(! x) {
-		printf("Failed to dlopen(), dlerror is %s\n", dlerror());
-	}
-	printf("dlopen finish .. %08x\n", x);
+	load_dependencies();
+	srand(time(NULL));
 
-	y = dlsym(x, "sassy_syscall");
-	printf("it's at 0x%08x\n", y);
+	// mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_ANONYMOUS, -1, 0);
 
 	return 0;
 }

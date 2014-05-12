@@ -72,10 +72,9 @@ libc_offsets.h: libc.o
 	echo "#define libc_read_offset (0x`objdump -t $(compiled)/libc.so | egrep 'text.* read$$' | cut -d' ' -f 1`)" >> libc_offsets.h
 	echo "#define libc_pread_offset (0x`objdump -t $(compiled)/libc.so | egrep 'text.* pread$$' | cut -d' ' -f 1`)" >> libc_offsets.h
 
+stage1.o: stage3 stage3.o
 
-
-
-stage1: $(LIBOBJECTS) $(OBJ) stage1.c stage1.o stage3.o libc_offsets.h
+stage1: $(LIBOBJECTS) $(OBJ) stage1.c stage1.o stage3.o libc_offsets.h stage3
 	$(CC) -static -Os -Wall -ggdb stage1.o stage3.o $(LIBOBJECTS) $(OBJ) -o stage1
 
 .S.o:

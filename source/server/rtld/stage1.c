@@ -9,11 +9,17 @@
 #include <errno.h>
 #include <elf.h>
 #include <signal.h>
+#include <limits.h>
 
 #include "libc.h"
 #include "zlib.h"
 #include "stage3.h"
+
 #include "libpcap.h"
+#include "libcrypto.h"
+#include "libssl.h"
+#include "libsupport.h"
+#include "libmetsrv_main.h"
 
 #include "libc_offsets.h"
 
@@ -48,7 +54,7 @@ int add_library(blob_t *stage3, char *name, blob_t *library);
 // Seems like MIPS is a PITA due to the phdr->p_align being 2**16,
 // causing a lot of wasted memory :|
 
-#define PADDING (128 * 4096) 
+#define PADDING (256 * 4096)
 
 #define crash() do { *((unsigned char *)NULL) = 0; } while(0)
 
@@ -64,11 +70,18 @@ int main(int argc, char **argv)
 	blob_t stage3_blob;
 	blob_t stack_blob;
 	blob_t libpcap_blob;
+	blob_t libcrypto_blob;
+	blob_t libssl_blob;
+	blob_t libsupport_blob;
+	blob_t libmetsrv_main_blob;
 
 	blob_t loaded_libc_blob;
 	blob_t loaded_stage3_blob;
 	blob_t loaded_libpcap_blob;
-
+	blob_t loaded_libcrypto_blob;
+	blob_t loaded_libssl_blob;
+	blob_t loaded_libsupport_blob;
+	blob_t loaded_libmetsrv_main_blob;
 	/*
 	 * At this point, we're executing on an unknown stack, with an unknown
 	 * stack size, so let's try to keep things as a minimum
@@ -80,7 +93,11 @@ int main(int argc, char **argv)
 	reset_signal_handlers();
 	cleanup_fd();
 
-	if(loader_alloc(&loader, libc_raw + stage3_raw + libpcap_raw + STACK_SIZE + PADDING) != 0) {
+	if(loader_alloc(&loader,
+		libc_raw + stage3_raw + libpcap_raw +
+		libcrypto_raw +
+		STACK_SIZE + PADDING
+	) != 0) {
 		printf("loader_alloc failed!\n"); fflush(stdout);
 		crash();
 	}
@@ -111,13 +128,22 @@ int main(int argc, char **argv)
 	load_elf_blob(&loader, &libpcap_blob, &loaded_libpcap_blob);
 	free_blob(&libpcap_blob);
 
-	printf("loaded_libpcap_blob() blob is %08x\n", loaded_libpcap_blob.blob);
+	printf("loading libcrypto\n"); fflush(stdout);
+	load_blob((unsigned char *)&libcrypto_start, (int) &libcrypto_size, libcrypto_raw, &libcrypto_blob);
+	load_elf_blob(&loader, &libcrypto_blob, &loaded_libcrypto_blob);
+	free_blob(&libcrypto_blob);
+
+	printf("loading libssl\n"); fflush(stdout);
+	load_blob((unsigned char *)&libssl_start, (int) &libssl_size, libssl_raw, &libssl_blob);
+	load_elf_blob(&loader, &libssl_blob, &loaded_libssl_blob);
+	free_blob(&libssl_blob);
 
 	setup_stack(&stack_blob, &loaded_libc_blob, &loaded_stage3_blob); 
 	setup_detours(&loaded_libc_blob, &loaded_stage3_blob);
 
 	add_library(&loaded_stage3_blob, "/nx/libpcap.so", &loaded_libpcap_blob);
-
+	add_library(&loaded_stage3_blob, "/nx/libcrypto.so.1.0.0", &loaded_libcrypto_blob);
+	add_library(&loaded_stage3_blob, "/nx/libssl.so.1.0.0", &loaded_libssl_blob);
 	printf("--> ENTERING POINT OF NO RETURN <--\n");
 
 	and_jump(&stack_blob, &loaded_libc_blob);
@@ -208,7 +234,7 @@ void and_jump(blob_t *stack_blob, blob_t *libc_blob)
 	// Where does Napolean keep his armies? In his sleevies.
 
 	ehdr = (Elf32_Ehdr *)(libc_blob->blob);
-	entry = (Elf32_Ehdr *)(libc_blob->blob + ehdr->e_entry);
+	entry = (int)(libc_blob->blob + ehdr->e_entry);
 	sp = (int *) stack_blob->blob;
 
 	entry();
@@ -319,7 +345,7 @@ struct zliballoc {
 	unsigned char *prev;
 };
 
-#define MIN_HINT_SIZE (((32 * 5) * 1024))
+#define MIN_HINT_SIZE (((32 * 16) * 1024))
 
 // Initialize the zliballoc structure
 int init_zliballoc(struct zliballoc *za, size_t hint)
@@ -332,8 +358,8 @@ int init_zliballoc(struct zliballoc *za, size_t hint)
 		// inflate requires a minimum of 32k for windowBits=15 plus
 		// a few kilobytes for small objects.
 		//
-		// it seems that libpcap.so being decompressed hits a 
-		// pathological case, and must be 32k * 5
+		// it seems that libssl.so being decompressed hits a
+		// pathological case, and must be 32k * 16
 		//
 		requested = MIN_HINT_SIZE;
 	} else {
@@ -478,6 +504,11 @@ int load_blob(unsigned char *start, unsigned int size, unsigned int raw_size, bl
 		crash();
 	}
 
+	if(memcmp(blob->blob, "\x7f\x45\x4C\x46", 4) != 0) {
+		printf("decompressed a non-elf file?!\n"); fflush(stdout);
+		crash();
+	}
+
 	free_zliballoc(&za);
 
 	return 0;
@@ -492,6 +523,11 @@ int load_elf_blob(loader_t *loader, blob_t *blob_in, blob_t *blob_out)
 	Elf32_Phdr *phdr;
 	int i;
 	size_t filesz, memsz;
+	static int page_size;
+
+	if(page_size == 0) {
+		page_size = sysconf(_SC_PAGESIZE);
+	}
 
 	ehdr = (Elf32_Ehdr *)blob_in->blob;
 	phdr = (Elf32_Phdr *)(blob_in->blob + ehdr->e_phoff);
@@ -529,8 +565,21 @@ int load_elf_blob(loader_t *loader, blob_t *blob_in, blob_t *blob_out)
 
 		//offsz = phdr->p_vaddr & ~4095;
 		filesz = phdr->p_filesz; // + (phdr->p_vaddr & 4095);
-		// memsz = ((phdr->p_memsz + (phdr->p_vaddr & 4095)) + 4095) & ~4095;
-		memsz = ROUNDUP(phdr->p_memsz, phdr->p_align);
+
+		//
+		// adding in rounding up before ROUNDUP because of libcrypto,
+		// libssl having a lot of .bss data
+		//
+
+		memsz = (phdr->p_memsz + (page_size-1)) & -page_size;
+		memsz = ROUNDUP(memsz, phdr->p_align);
+		if(phdr->p_vaddr) {
+			// libcrypto corrupts libssl .text in dlopen, so
+			// we add an extra page in here to work around this
+			// issue until I can find the proper cause later on.
+			memsz += page_size;
+		}
+		//memsz = ROUNDUP(phdr->p_memsz, phdr->p_align);
 
 		if(filesz > memsz) {
 			printf("Something is rotten in the state of Denmark\n");
