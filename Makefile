@@ -21,8 +21,8 @@ ROOT=$(basename $(CURDIR:%/=%))
 
 COMPILED=${ROOT}/${build_tmp}/compiled
 
-objects  = $(COMPILED)/libc.so
-objects += $(COMPILED)/libpcap.so
+#objects  = $(COMPILED)/libc.so
+objects = $(COMPILED)/libpcap.so
 objects += $(COMPILED)/libcrypto.so
 objects += $(COMPILED)/libssl.so
 objects += $(COMPILED)/libsupport.so
