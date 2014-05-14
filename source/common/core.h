@@ -153,16 +153,20 @@ typedef enum
 	TLV_TYPE_TEMP                = TLV_VALUE(TLV_META_TYPE_COMPLEX, 60000),   ///< Represents a temporary value.
 } TlvType;
 
-#ifdef _WIN32
+
 
 #ifndef QWORD
+#ifdef _WIN32
 typedef unsigned __int64	QWORD;
-#endif
+#else
+typedef u_int64_t QWORD;
+#endif // _WIN32
+#endif // QWORD
 
 #define ntohq( qword )		( (QWORD)ntohl( qword & 0xFFFFFFFF ) << 32 ) | ntohl( qword >> 32 )
 #define htonq( qword )		ntohq( qword )
 
-#endif
+
 
 typedef struct
 {
