@@ -7,6 +7,8 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <time.h>
+#include <errno.h>
+#include <sys/syscall.h>
 
 #define _GNU_SOURCE
 #include <signal.h>
@@ -381,7 +383,11 @@ void trap_handler(int sig, siginfo_t *info, void *_ctx)
 void load_dependencies()
 {
 	void *x;
-	char *dependencies[] = { "libpcap.so", "libcrypto.so.1.0.0", "libssl.so.1.0.0", NULL };
+	char *dependencies[] = {
+		"libpcap.so", "libcrypto.so.1.0.0",
+		"libssl.so.1.0.0", "libsupport.so",
+		"libmetsrv_main.so", NULL
+	};
 	int i;
 
 	in_dlopen = 1;
@@ -404,6 +410,64 @@ void load_dependencies()
 }
 
 #include <sys/mman.h>
+
+
+/*
+ * libsupport requires some bionic libc specific symbols. Implement here.
+ * __futex_wait influenced from do_wait in musl-libc.
+ *
+ * At some stage, we might need to move this into libsupport, or change
+ * how they're resolved.
+ *
+ */
+
+#ifndef FUTEX_WAIT
+#define FUTEX_WAIT              0
+#endif
+
+#ifndef FUTEX_WAKE
+#define FUTEX_WAKE              1
+#endif
+
+int __futex_wait(volatile void *ftx, int val, const struct timespec *timeout)
+{
+	int r;
+	r = -syscall(SYS_futex, ftx, FUTEX_WAIT, val, timeout);
+
+	if(r == EINTR || r == EINVAL || r == ETIMEDOUT) return r;
+	return 0;
+}
+
+int __futex_wake(volatile void *ftx, int count)
+{
+	int r;
+
+	r = -syscall(SYS_futex, ftx, FUTEX_WAKE, 1, NULL);
+	if(r == EINTR || r == EINVAL || r == ETIMEDOUT) return r;
+	return 0;
+}
+
+pid_t gettid()
+{
+	return (pid_t) syscall(SYS_gettid);
+}
+
+void *dlopenbuf(char *name, void *data, size_t len)
+{
+	printf("dlopenbuf not implemented yet!\n");
+	fflush(stdout);
+	crash();
+}
+
+int __atomic_inc(volatile int *x)
+{
+	printf("atomic inc not implemented yet!\n");
+	fflush(stdout);
+	crash();
+}
+
+// end bionic futex support.
+
 
 int main(int argc, char **argv)
 {

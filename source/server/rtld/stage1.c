@@ -138,12 +138,25 @@ int main(int argc, char **argv)
 	load_elf_blob(&loader, &libssl_blob, &loaded_libssl_blob);
 	free_blob(&libssl_blob);
 
+	printf("loading libsupport\n"); fflush(stdout);
+	load_blob((unsigned char *)&libsupport_start, (int)&libsupport_size, libsupport_raw, &libsupport_blob);
+	load_elf_blob(&loader, &libsupport_blob, &loaded_libsupport_blob);
+	free_blob(&libsupport_blob);
+
+	printf("loading libmetsrv_main\n"); fflush(stdout);
+	load_blob((unsigned char *)&libmetsrv_main_start, (int)&libmetsrv_main_size, libmetsrv_main_raw, &libmetsrv_main_blob);
+	load_elf_blob(&loader, &libmetsrv_main_blob, &loaded_libmetsrv_main_blob);
+	free_blob(&libmetsrv_main_blob);
+	printf("finished loading libraries\n");
+
 	setup_stack(&stack_blob, &loaded_libc_blob, &loaded_stage3_blob); 
 	setup_detours(&loaded_libc_blob, &loaded_stage3_blob);
 
 	add_library(&loaded_stage3_blob, "/nx/libpcap.so", &loaded_libpcap_blob);
 	add_library(&loaded_stage3_blob, "/nx/libcrypto.so.1.0.0", &loaded_libcrypto_blob);
 	add_library(&loaded_stage3_blob, "/nx/libssl.so.1.0.0", &loaded_libssl_blob);
+	add_library(&loaded_stage3_blob, "/nx/libsupport.so", &loaded_libsupport_blob);
+	add_library(&loaded_stage3_blob, "/nx/libmetsrv_main.so", &loaded_libmetsrv_main_blob);
 	printf("--> ENTERING POINT OF NO RETURN <--\n");
 
 	and_jump(&stack_blob, &loaded_libc_blob);

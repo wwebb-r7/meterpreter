@@ -1,0 +1,7 @@
+{
+	__futex_wait;
+	__futex_wake;
+	gettid;
+	dlopenbuf;
+	__atomic_inc;
+};

@@ -23,11 +23,11 @@ gzip2raw: gzip2raw.c
 	gcc -Wall -ggdb -O2 gzip2raw.c -o gzip2raw
 
 stage3: gzip2raw stage3.c
-	$(CC) -Wall -ggdb -O2 -pie -fPIC -o stage3 stage3.c
+	$(CROSS)gcc -Wall -ggdb -O2 -pie -fPIC -Wl,--dynamic-list=symbols -o stage3 stage3.c
 	([ "$(DEBUG)" != "true" ] && $(STRIP) --strip-debug stage3) || true
 	gzip -9nfc < stage3 >stage3.gz
 	./gzip2raw stage3.gz stage3.raw
-	$(OBJCOPY) -I binary -O elf32-tradbigmips \
+	$(CROSS)objcopy -I binary -O elf32-tradbigmips \
 		--binary-architecture=mips \
 		--redefine-sym _binary_stage3_raw_start=stage3_start \
 		--redefine-sym _binary_stage3_raw_end=stage3_end \
@@ -45,10 +45,10 @@ stage3: gzip2raw stage3.c
 %.o: $(compiled)/%.so
 	[ -d tmp ] || mkdir tmp
 	cp $< tmp/$(*).tmp
-	([ "$(DEBUG)" != "true" ] && $(STRIP) --strip-debug tmp/$(*).tmp) || true
+	([ "$(DEBUG)" != "true" ] && $(CROSS)strip --strip-debug tmp/$(*).tmp) || true
 	gzip -9nfc < tmp/$(*).tmp >tmp/$(*).gz
 	./gzip2raw tmp/$(*).gz tmp/$(*).raw
-	$(OBJCOPY) -I binary -O elf32-tradbigmips \
+	$(CROSS)objcopy -I binary -O elf32-tradbigmips \
 		--binary-architecture=mips \
 		--redefine-sym _binary_tmp_$*_raw_start=$*_start \
 		--redefine-sym _binary_tmp_$*_raw_end=$*_end \
@@ -72,16 +72,16 @@ libc_offsets.h: libc.o
 	echo "#define libc_read_offset (0x`objdump -t $(compiled)/libc.so | egrep 'text.* read$$' | cut -d' ' -f 1`)" >> libc_offsets.h
 	echo "#define libc_pread_offset (0x`objdump -t $(compiled)/libc.so | egrep 'text.* pread$$' | cut -d' ' -f 1`)" >> libc_offsets.h
 
-stage1.o: stage3 stage3.o
+stage1.o: stage3 stage3.o $(LIBOBJECTS) libc_offsets.h symbols
 
 stage1: $(LIBOBJECTS) $(OBJ) stage1.c stage1.o stage3.o libc_offsets.h stage3
-	$(CC) -static -Os -Wall -ggdb stage1.o stage3.o $(LIBOBJECTS) $(OBJ) -o stage1
+	$(CROSS)gcc -static -Os -Wall -ggdb stage1.o stage3.o $(LIBOBJECTS) $(OBJ) -o stage1
 
 .S.o:
-	$(CC) $(CFLAGS) -c $<
+	$(CROSS)gcc $(CFLAGS) -c $<
 
 .c.o:
-	$(CC) $(CFLAGS) -c $<
+	$(CROSS)gcc $(CFLAGS) -c $<
 
 clean:
 	rm -f $(OBJECTS)
