@@ -26,8 +26,11 @@ all:  libmetsrv_main.so
 debug: CFLAGS+=-ggdb
 debug: all
 
+.c.o:
+	$(CROSS)gcc $(CFLAGS) -c $<
+
 libmetsrv_main.so: $(objects)
-	$(CC) -shared $(CFLAGS) -o $@ $(objects) -export-dynamic  -lcrypto -lssl  -lsupport
+	$(CROSS)gcc -shared $(CFLAGS) -o $@ $(objects) -export-dynamic  -lcrypto -lssl  -lsupport
 
 clean:
 	@echo "ARCHVPATH= " $(ARCHVPATH) " VPATH= " $(VPATH)
