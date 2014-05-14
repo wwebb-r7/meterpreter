@@ -10,10 +10,17 @@
 #include <errno.h>
 #include <sys/syscall.h>
 
+#include <netinet/in.h>
+#include <sys/socket.h>
+
 #define _GNU_SOURCE
 #include <signal.h>
 
-#define crash() do { (*(unsigned char *)NULL) = 0xff; } while (0)
+#define crash() do { \
+  printf(":-( crash at %s:%d\n", __FILE__, __LINE__); \
+  fflush(stdout); \
+  (*(unsigned char *)NULL) = 0xff; \
+} while (0)
 
 //
 // open()    syscall()
@@ -22,7 +29,7 @@
 // fstat64() __syscall()
 //
 // Instead of function redirecting, is there a better way to do this?
-// 
+//
 
 #define HOOKED_FUNC_COUNT 6
 #define PLATFORM_OFFSET(x) (x)
@@ -38,7 +45,7 @@
 #define READ_OFFSET 4
 #define PREAD_OFFSET 5
 
-struct detours { 
+struct detours {
 	unsigned long addr;
 	unsigned long orig;
 };
@@ -59,13 +66,13 @@ static int in_dlopen;
 static int fd_to_library_id(int fd)
 {
 	int match, id;
-	
+
 	id = (fd & 0xff);
 	match = (fd >> 8) & 0xffffff;
-	
+
 	if(match != 31337) return -1;
 	if(id < 0 || id >= LIBRARY_COUNT) return -1;
-	
+
 	return id;
 }
 
@@ -74,7 +81,7 @@ void *my_open(int *emul, char *name, int flags, mode_t mode)
 	int i;
 	int ret;
 
-	printf("my_open(\"%s\", %d, %o)\n", name, flags, mode); fflush(stdout);
+	printf("my_open(\"%s\", %d, %o)\n", name, flags, mode);
 
 	for(i = 0; i < LIBRARY_COUNT; i++) {
 		printf("%s vs %s\n", libraries[i].name, name);
@@ -91,7 +98,6 @@ void *my_open(int *emul, char *name, int flags, mode_t mode)
 
 	if(flags != (O_RDONLY|O_CLOEXEC)) {
 		printf("my_open(): hmm. flags are %d, not %d .. \n", flags, (O_RDONLY|O_CLOEXEC));
-		fflush(stdout);
 		crash();
 		return NULL;
 	}
@@ -109,7 +115,7 @@ void *my_close(int *emul, int fd)
 	id = fd_to_library_id(fd);
 	if(fd == -1) return NULL;
 
-	*emul = 1;	
+	*emul = 1;
 	return NULL;
 }
 
@@ -118,18 +124,17 @@ void *my_fstat(int *emul, int fd, struct stat *statbuf)
 	int id;
 
 	printf("my_fstat(.., 0x%08x) -> fd is %d, id is %d\n", statbuf, fd, id);
-	fflush(stdout);
 
 	id = fd_to_library_id(fd);
 	if(id == -1) return NULL;
-	
+
 	printf("emulating fstat()\n");
 
 	*emul = 1;
 	memset(statbuf, 0, sizeof(struct stat));
 	statbuf->st_dev = 0x31337;
 	statbuf->st_ino = id;
-	
+
 	return NULL;
 
 }
@@ -142,9 +147,8 @@ void *my_read(int *emul, int fd, void *buffer, size_t count)
 
 	id = fd_to_library_id(fd);
 	if(id == -1) return NULL;
-	
-	printf("emulating read.. first_mmap is at 0x%08x\n", libraries[id].first_mmap); 
-	fflush(stdout);
+
+	printf("emulating read.. first_mmap is at 0x%08x\n", libraries[id].first_mmap);
 
 	if(memcmp(libraries[id].first_mmap, "\x7f\x45\x4c\x46", 4) != 0) {
 		char *p;
@@ -157,7 +161,6 @@ void *my_read(int *emul, int fd, void *buffer, size_t count)
 			p[2],
 			p[3]
 		);
-		fflush(stdout);
 		crash();
 	}
 
@@ -173,17 +176,17 @@ void *my_read(int *emul, int fd, void *buffer, size_t count)
 void *my_pread(int *emul, int fd, void *buffer, size_t count, off_t offset)
 {
 	int id;
-	
+
 	printf("my_pread(%d, 0x%08x, %d, %d) .. \n", fd, buffer, count, offset);
 
 	id = fd_to_library_id(fd);
 	if(id == -1) return NULL;
-	
-	printf("emulating pread() .. \n"); fflush(stdout);
+
+	printf("emulating pread() .. \n");
 
 	*emul = 1;
 	memcpy(buffer, libraries[id].first_mmap + offset, count);
-	
+
 	return (void *)count;
 }
 
@@ -191,14 +194,14 @@ void *my_mmap(int *emul, void *addr, size_t length, int prot, int flags, int fd,
 {
 	int id;
 
-	printf("my_mmap(%p, %d, %d, %d, %d, %p)\n", 
+	printf("my_mmap(%p, %d, %d, %d, %d, %p)\n",
 		addr,
 		length,
 		prot,
 		flags,
-		fd, 
+		fd,
 		off
-	); fflush(stdout);
+	);
 
 	id = fd_to_library_id(fd);
 
@@ -208,7 +211,7 @@ void *my_mmap(int *emul, void *addr, size_t length, int prot, int flags, int fd,
 			unsigned char *x;
 			size_t cnt;
 
-			printf("dlopen wants to zerofill some memory. checking it's all 0\n"); fflush(stdout);
+			printf("dlopen wants to zerofill some memory. checking it's all 0\n");
 
 			*emul = 1;
 			x = (unsigned char *)addr;
@@ -216,7 +219,6 @@ void *my_mmap(int *emul, void *addr, size_t length, int prot, int flags, int fd,
 				if(x[cnt] != 0) {
 					printf("offset %d has byte %02x\n", cnt, x[cnt]);
 					printf("actually it's %s if that helps :/\n", x + cnt);
-					fflush(stdout);
 					crash();
 				}
 			}
@@ -229,7 +231,7 @@ void *my_mmap(int *emul, void *addr, size_t length, int prot, int flags, int fd,
 
 
 
-	printf("emulating %s mmap()..\n", addr ? "second" : "first"); fflush(stdout);
+	printf("emulating %s mmap()..\n", addr ? "second" : "first");
 	*emul = 1;
 
 	if(!addr) {
@@ -261,7 +263,7 @@ int platform_set_return_value(mcontext_t *mctx, void *value)
 int platform_perform_return(mcontext_t *mctx)
 {
 	mctx->pc = mctx->regs[31];
-	return 0;	
+	return 0;
 }
 
 int platform_continue_execution(mcontext_t *mctx, int idx)
@@ -292,7 +294,7 @@ void trap_handler(int sig, siginfo_t *info, void *_ctx)
 	mcontext_t *mctx = &ctx->uc_mcontext;
 	int emulated;
 	void *ret;
-	
+
 	ret = NULL;
 	emulated = 0;
 
@@ -305,7 +307,7 @@ void trap_handler(int sig, siginfo_t *info, void *_ctx)
 	stack = mctx->regs[30];
 	for(stack = mctx->regs[30], i = 0; i < 32; i++) {
 		printf("stack[%d] is 0x%08x\n", i, stack[i]);
-	} 
+	}
 
 #endif
 
@@ -316,13 +318,11 @@ void trap_handler(int sig, siginfo_t *info, void *_ctx)
 		}
 	}
 
-	fflush(stdout);
-
 	switch(i) {
 		case OPEN_OFFSET:
-			ret = my_open(&emulated, 
-				(char *)platform_arg(mctx, 0), 
-				(int)platform_arg(mctx, 1), 
+			ret = my_open(&emulated,
+				(char *)platform_arg(mctx, 0),
+				(int)platform_arg(mctx, 1),
 				(mode_t)platform_arg(mctx, 2)
 			);
 			break;
@@ -330,8 +330,8 @@ void trap_handler(int sig, siginfo_t *info, void *_ctx)
 			ret = my_close(&emulated, (int)platform_arg(mctx, 0));
 			break;
 		case FSTAT_OFFSET:
-			ret = my_fstat(&emulated, 
-				(int)platform_arg(mctx, 0), 
+			ret = my_fstat(&emulated,
+				(int)platform_arg(mctx, 0),
 				(struct stat *)platform_arg(mctx, 1)
 			);
 			break;
@@ -347,15 +347,15 @@ void trap_handler(int sig, siginfo_t *info, void *_ctx)
 
 			break;
 		case READ_OFFSET:
-			ret = my_read(&emulated, 
+			ret = my_read(&emulated,
 				(int)platform_arg(mctx, 0), // fd
 				platform_arg(mctx, 1), // buffer
 				(size_t) platform_arg(mctx, 2) // size
 			);
 			break;
 		case PREAD_OFFSET:
-			ret = my_pread(&emulated, 
-				(int)platform_arg(mctx, 0), 
+			ret = my_pread(&emulated,
+				(int)platform_arg(mctx, 0),
 				platform_arg(mctx, 1),
 				(size_t) platform_arg(mctx, 2),
 				(off_t) platform_arg(mctx, 3)
@@ -368,21 +368,23 @@ void trap_handler(int sig, siginfo_t *info, void *_ctx)
 	}
 
 	if(emulated) {
-		printf("Emulating and returning\n"); fflush(stdout);
+		printf("Emulating and returning\n");
 		platform_set_return_value(mctx, ret);
 		platform_perform_return(mctx);
 		return;
 	}
 
-	printf("Continuing execution\n"); fflush(stdout);
-	// otherwise, we need to continue execution .. 
+	printf("Continuing execution\n");
+	// otherwise, we need to continue execution ..
 	platform_continue_execution(mctx, i);
-	
+
 }
 
-void load_dependencies()
+void *load_dependencies()
 {
 	void *x;
+
+	// libmetsrv_main must be last on the list.
 	char *dependencies[] = {
 		"libpcap.so", "libcrypto.so.1.0.0",
 		"libssl.so.1.0.0", "libsupport.so",
@@ -394,19 +396,19 @@ void load_dependencies()
 
 	for(i = 0; dependencies[i]; i++) {
 		printf("performing a dlopen on %s\n", dependencies[i]);
-		fflush(stdout);
 
 		x = dlopen(dependencies[i], RTLD_NOW);
 		if(! x) {
-			printf("Failure to dlopen(\"%s\"): %s\n", dependencies[i], dlerror()); 
-			fflush(stdout);
-			exit(EXIT_FAILURE);
+			printf("Failure to dlopen(\"%s\"): %s\n", dependencies[i], dlerror());
+			// exit(EXIT_FAILURE);
+			crash();
 		}
 
 		printf("%s has been loaded at %p\n", dependencies[i], x);
 	}
 
 	in_dlopen = 0;
+	return x;
 }
 
 #include <sys/mman.h>
@@ -455,27 +457,83 @@ pid_t gettid()
 void *dlopenbuf(char *name, void *data, size_t len)
 {
 	printf("dlopenbuf not implemented yet!\n");
-	fflush(stdout);
 	crash();
 }
 
 int __atomic_inc(volatile int *x)
 {
 	printf("atomic inc not implemented yet!\n");
-	fflush(stdout);
 	crash();
 }
 
 // end bionic futex support.
 
+#define HOST "10.0.2.3"
+#define PORT 4444
 
-int main(int argc, char **argv)
+int connect_to_handler()
+{
+	int fd;
+	struct sockaddr_in sin;
+
+	memset(&sin, 0, sizeof(struct sockaddr_in));
+	sin.sin_family = AF_INET;
+	sin.sin_addr.s_addr = inet_addr(HOST);
+	sin.sin_port = htons(PORT);
+
+	fd = socket(AF_INET, SOCK_STREAM, 0);
+	if(! fd) {
+		printf("Unable to socket(): %s\n", strerror(errno));
+		exit(0);
+	}
+
+	if(connect(fd, (void *)&sin, sizeof(struct sockaddr_in)) == -1) {
+		printf("Unable to connect(%s, %d): %s\n", HOST, PORT, strerror(errno));
+		exit(0);
+	}
+
+	return fd;
+
+}
+
+int main(int argc, char **argv, char **envp)
 {
 	void *x;
-	load_dependencies();
-	srand(time(NULL));
+	int (*server_setup)(int socket);
+	int fd;
 
-	// mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_ANONYMOUS, -1, 0);
+	// setvbuf(stdout, NULL, 0, _IONBF);
+
+	x = load_dependencies();
+
+
+	if(! x) {
+		printf("load_dependencies() must return the libmetsrv_main handle!\n");
+		crash();
+	}
+
+	printf("dependencies loaded!\n");
+	fflush(stdout);
+
+	server_setup = dlsym(x, "server_setup");
+	if(! server_setup) {
+		printf("server_setup not found! :(\n");
+		crash();
+	}
+
+	printf("server_setup found at 0x%08x\n", server_setup);
+	fflush(stdout);
+
+	// xxx, determine FD by inpsecting envp I guess ..
+
+	fd = connect_to_handler();
+	printf("fd for server connection is %d\n", fd); fflush(stdout);
+
+	server_setup(fd);
+
+	printf("server_setup() returned ... :-(\n");
+	fflush(stdout);
+	crash();
 
 	return 0;
 }
