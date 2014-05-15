@@ -61,9 +61,17 @@ int fs_stat(LPCSTR filename, struct meterp_stat *buf) {
 		buf->st_gid   = sbuf.st_gid;
 		buf->st_rdev  = sbuf.st_rdev;
 		buf->st_size  = sbuf.st_size;
+#ifdef _WIN32 
 		buf->st_atime = (unsigned long long)sbuf.st_atime;
 		buf->st_mtime = (unsigned long long)sbuf.st_mtime;
 		buf->st_ctime = (unsigned long long)sbuf.st_ctime;
+#else
+		// musl-libc specific :/
+		buf->st_atime = (unsigned long long)sbuf.st_atim.tv_sec;
+		buf->st_mtime = (unsigned long long)sbuf.st_mtim.tv_sec;
+		buf->st_ctime = (unsigned long long)sbuf.st_ctim.tv_sec;
+#endif
+		
 		return 0;
 	} else {
 #ifdef _WIN32

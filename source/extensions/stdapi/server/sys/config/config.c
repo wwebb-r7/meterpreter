@@ -3,6 +3,7 @@
 #ifdef _WIN32
 #include <Sddl.h>
 #else
+#define _GNU_SOURCE
 #include <sys/utsname.h>
 #endif
 

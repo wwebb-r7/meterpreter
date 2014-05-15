@@ -778,10 +778,14 @@ DWORD request_sys_process_execute(Remote *remote, Packet *packet)
 					}
 				}
 
-				if(! found) return; // XXX, not too much we can do in this case ?
+				// if(found) {
+				// perform_in_mem_exe(argv, environ, inMemoryData.buffer, inMemoryData.header.length, phdr->p_vaddr & ~4095, ehdr->e_entry);
+				// }
 
-				perform_in_mem_exe(argv, environ, inMemoryData.buffer, inMemoryData.header.length, phdr->p_vaddr & ~4095, ehdr->e_entry);
+				dprintf("this is not enterprise scalable code just yet unfortunately :(\n");
 			} else {
+				// musl doesn't export environ it seems..
+				char *environ[] = { "HAPPY=GOLUCKY", NULL };
 				execve(path, argv, environ);
 			}
 

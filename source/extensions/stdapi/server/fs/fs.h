@@ -25,7 +25,11 @@ DWORD request_fs_file_move(Remote *remote, Packet *packet);
  */
 DWORD request_fs_file_channel_open(Remote *remote, Packet *packet);
 
-
+// musl-libc "cleverly" defines st_atime as st_atim to fit in with
+// their struct stat..
+#undef st_atime
+#undef st_mtime
+#undef st_ctime
 
 /*
  * Stat structures on Windows and various Unixes are all slightly different.
