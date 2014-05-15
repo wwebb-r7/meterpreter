@@ -31,7 +31,7 @@ LOCK * lock_create( VOID )
 #ifdef _WIN32
 		lock->handle = CreateMutex( NULL, FALSE, NULL );
 #else
-		pthread_mutex_init(lock->handle, NULL);
+		pthread_mutex_init(&lock->handle, NULL);
 #endif
 	}
 	return lock;
@@ -49,7 +49,7 @@ VOID lock_destroy( LOCK * lock )
 #ifdef _WIN32
 		CloseHandle( lock->handle );
 #else
-		pthread_mutex_destroy(lock->handle);
+		pthread_mutex_destroy(&lock->handle);
 #endif
 
 		free( lock );
@@ -65,7 +65,7 @@ VOID lock_acquire( LOCK * lock )
 #ifdef _WIN32
 		WaitForSingleObject( lock->handle, INFINITE );
 #else
-		pthread_mutex_lock(lock->handle);
+		pthread_mutex_lock(&lock->handle);
 #endif
 	}
 }
@@ -79,7 +79,7 @@ VOID lock_release( LOCK * lock )
 #ifdef _WIN32
 		ReleaseMutex( lock->handle );
 #else
-		pthread_mutex_unlock(lock->handle);
+		pthread_mutex_unlock(&lock->handle);
 #endif
 	}
 }
