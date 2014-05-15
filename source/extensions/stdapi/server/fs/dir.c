@@ -169,7 +169,7 @@ DWORD request_fs_ls(Remote *remote, Packet *packet)
 #ifdef _WIN32
 		} while (FindNextFile(ctx, &data));
 #else
-	        } while (data = readdir(ctx));
+	        } while ((data = readdir(ctx)) != NULL);
 #endif
 #undef DF_NAME
 
