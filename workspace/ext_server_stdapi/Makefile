@@ -1,22 +1,16 @@
 VPATH=../../source/extensions/stdapi
-
 OPENSSL=../../source/openssl/include
 COMMON=../../source/common
 SERVER=../../source/server
 
-CFLAGS=-fno-stack-protector -nostdinc -nostdlib -fPIC -DPIC -Wall
+CFLAGS=-fno-stack-protector -fPIC -DPIC -Wall
 CFLAGS+=-D_UNIX -D__linux__
 CFLAGS+=-I${COMMON} -I${SERVER} -I${OPENSSL}
-CFLAGS+= -I ../../source/bionic/libc/include -I ../../source/bionic/libc/kernel/common/linux/ -I ../../source/bionic/libc/kernel/common/ -I ../../source/bionic/libc/arch-x86/include/
-CFLAGS+= -I ../../source/bionic/libc/kernel/arch-x86/
-CFLAGS+= -Dwchar_t="char" -fno-builtin -D_SIZE_T_DECLARED -DElf_Size="u_int32_t"
-CFLAGS+= -D_BYTE_ORDER=_LITTLE_ENDIAN
-CFLAGS+= -lgcc -L../../source/bionic/compiled
-CFLAGS+= -I../../source/extensions/stdapi/server -lc -lsupport -lmetsrv_main
+CFLAGS+= -I../../source/extensions/stdapi/server
 
-CFLAGS+= -march=i386 -m32 -Os
+#-lsupport -lmetsrv_main
 
-#LDFLAGS= -fPIC -Bshareable -lc
+CFLAGS+= -Os
 
 ifeq ($(OSNAME), FreeBSD)
 	OS= bsd
@@ -24,6 +18,8 @@ else
 	OS=$(OSNAME)
 	CFLAGS+= -fno-stack-protector -D__linux__
 endif
+
+LDFLAGS=-L../../posix-meterp-build-tmp/compiled/ -lcrypto -lssl -lsupport -lmetsrv_main
 
 objects = \
 	server/fs/dir.o \
@@ -39,27 +35,29 @@ objects = \
 	server/net/socket/udp.o \
 	server/stdapi.o \
 	server/sys/config/config.o \
-	server/sys/process/linux-in-mem-exe.o \
 	server/sys/process/process.o \
-	server/sys/process/ps.o \
+	server/sys/process/ps.o 
+
+local_objects = \
+	dir.o file.o fs_util.o general.o interface.o route.o arp.o \
+	netstat.o tcp.o tcp_server.o udp.o stdapi.o config.o \
+	process.o ps.o
+
+	# server/sys/process/linux-in-mem-exe.o \
 
 all: ext_server_stdapi.so
-
-output_dirs:
-	mkdir -p server/fs
-	mkdir -p server/net/config
-	mkdir -p server/net/socket
-	mkdir -p server/sys/config
-	mkdir -p server/sys/process
 
 debug: CFLAGS+=-ggdb
 debug: all
 
-ext_server_stdapi.so: output_dirs $(objects)
-	$(CC) -Wl,--hash-style=sysv -shared $(CFLAGS) $(objects) -lcrypto -o $@
+.c.o:
+	$(CROSS)gcc $(CFLAGS) -c $<
+
+ext_server_stdapi.so: $(objects)
+	$(CROSS)gcc -shared $(CFLAGS) -o $@ $(local_objects) $(LDFLAGS)
 
 
-.PHONY: clean debug output_dirs
+.PHONY: clean debug
 clean:
 	rm -f *.o *.so *~
 	rm -f $(objects) ext_server_stdapi.so
