@@ -16,6 +16,9 @@
 #define _GNU_SOURCE
 #include <signal.h>
 
+#include "elfloader.h"
+#include "blob.h"
+
 #define crash() do { \
   printf(":-( crash at %s:%d\n", __FILE__, __LINE__); \
   fflush(stdout); \
@@ -35,7 +38,7 @@
 #define PLATFORM_OFFSET(x) (x)
 
 // pcap, crypto, ssl, support, metsrv, custom
-#define LIBRARY_COUNT 7
+#define LIBRARY_COUNT 12
 
 
 #define OPEN_OFFSET  0
@@ -52,11 +55,14 @@ struct detours {
 
 // must be in sync with stage1.c ..
 struct libraries {
-	char name[32];
+	char name[64];
 	void *first_mmap;
 	void *second_mmap;
 };
 
+// this comes pre-populated due to stage1
+// code populating this structure for us.
+loader_t loader_info;
 
 struct detours detours[HOOKED_FUNC_COUNT];
 struct libraries libraries[LIBRARY_COUNT];
@@ -434,7 +440,9 @@ void *load_dependencies()
 int __futex_wait(volatile void *ftx, int val, const struct timespec *timeout)
 {
 	int r;
+	printf("__futex_wait(%p, %d, %p) called\n", ftx, val, timeout); fflush(stdout);
 	r = -syscall(SYS_futex, ftx, FUTEX_WAIT, val, timeout);
+	printf("return value is %d - also %s\n", r, strerror(r));
 
 	if(r == EINTR || r == EINVAL || r == ETIMEDOUT) return r;
 	return 0;
@@ -444,7 +452,10 @@ int __futex_wake(volatile void *ftx, int count)
 {
 	int r;
 
+	printf("__futuex_wake(%p, %d) called\n", ftx, count); fflush(stdout);
 	r = -syscall(SYS_futex, ftx, FUTEX_WAKE, 1, NULL);
+	printf("return value is %d - also %s\n", r, strerror(r));
+
 	if(r == EINTR || r == EINVAL || r == ETIMEDOUT) return r;
 	return 0;
 }
@@ -456,8 +467,41 @@ pid_t gettid()
 
 void *dlopenbuf(char *name, void *data, size_t len)
 {
-	printf("dlopenbuf not implemented yet!\n");
-	crash();
+	blob_t blob_in = { 0 }, blob_out = { 0 };
+	int i;
+	void *r;
+
+	blob_in.blob = data;
+	blob_in.length = len;
+
+	if(strlen(name) >= (32 - 4)) {
+		printf("Filename is too big!\n");
+		return NULL;
+	}
+
+	if(load_elf_blob(&loader_info, &blob_in, &blob_out) == -1) {
+		printf("load_elf_buf failed\n");
+		crash();
+	}
+
+	for(i = 0; i < LIBRARY_COUNT; i++) {
+		if(! libraries[i].name[0]) break;
+	}
+
+	if(i == LIBRARY_COUNT) {
+		printf("Unable to find a spare spot for loadable libraries\n");
+		return NULL;
+	}
+
+	strcpy(libraries[i].name, "/nx/");
+	strcpy(libraries[i].name + 4, name);
+	libraries[i].first_mmap = blob_out.blob;
+
+	in_dlopen = 1;
+	r = dlopen(name, RTLD_NOW);
+	in_dlopen = 0;
+
+	return r;
 }
 
 int __atomic_inc(volatile int *x)
@@ -506,7 +550,6 @@ int main(int argc, char **argv, char **envp)
 
 	x = load_dependencies();
 
-
 	if(! x) {
 		printf("load_dependencies() must return the libmetsrv_main handle!\n");
 		crash();
@@ -525,6 +568,16 @@ int main(int argc, char **argv, char **envp)
 	fflush(stdout);
 
 	// xxx, determine FD by inpsecting envp I guess ..
+
+	printf("loader_info.base = %p\n", loader_info.base);
+	printf("loader_info.length = %d\n", loader_info.length);
+	printf("loader_info.next = %p\n", loader_info.next);
+	printf("loader_info remaining space = %d\n",
+		loader_info.length - (
+			(size_t)loader_info.next -
+			(size_t)loader_info.base
+		)
+	);
 
 	fd = connect_to_handler();
 	printf("fd for server connection is %d\n", fd); fflush(stdout);

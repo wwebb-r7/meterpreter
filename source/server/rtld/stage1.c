@@ -33,14 +33,10 @@ void and_jump(blob_t *stack_blob, blob_t *libc_blob);
 int setup_stack(blob_t *stack, blob_t *libc, blob_t *stage3);
 int setup_detours(blob_t *libc, blob_t *stage3);
 int add_library(blob_t *stage3, char *name, blob_t *library);
+void copy_loader_struct(blob_t *stage3, loader_t *loader);
 
 #define STACK_SIZE (1024 * 1024)
-
-// Allocate some spare pages for padding issues.
-// Seems like MIPS is a PITA due to the phdr->p_align being 2**16,
-// causing a lot of wasted memory :|
-
-#define PADDING (256 * 4096)
+#define LOADER_SIZE ((1024 * 1024) * 8)
 
 int main(int argc, char **argv)
 {
@@ -72,11 +68,7 @@ int main(int argc, char **argv)
 	reset_signal_handlers();
 	cleanup_fd();
 
-	if(loader_alloc(&loader,
-		libc_raw + stage3_raw + libpcap_raw +
-		libcrypto_raw +
-		STACK_SIZE + PADDING
-	) != 0) {
+	if(loader_alloc(&loader, STACK_SIZE + LOADER_SIZE) != 0) {
 		printf("loader_alloc failed!\n"); fflush(stdout);
 		crash();
 	}
@@ -136,7 +128,9 @@ int main(int argc, char **argv)
 	add_library(&loaded_stage3_blob, "/nx/libssl.so.1.0.0", &loaded_libssl_blob);
 	add_library(&loaded_stage3_blob, "/nx/libsupport.so", &loaded_libsupport_blob);
 	add_library(&loaded_stage3_blob, "/nx/libmetsrv_main.so", &loaded_libmetsrv_main_blob);
+	copy_loader_struct(&loaded_stage3_blob, &loader);
 	printf("--> ENTERING POINT OF NO RETURN <--\n");
+
 
 	and_jump(&stack_blob, &loaded_libc_blob);
 
@@ -145,11 +139,19 @@ int main(int argc, char **argv)
 
 // must be in sync with stage3.c ..
 struct libraries {
-	char name[32];
+	char name[64];
 	void *first_mmap;
 	void *second_mmap;
 };
 
+void copy_loader_struct(blob_t *stage3, loader_t *loader)
+{
+	unsigned char *p;
+
+	p = stage3->blob + stage3_loader_info_offset;
+
+	memcpy(p, (void *)loader, sizeof(loader_t));
+}
 
 int add_library(blob_t *stage3, char *name, blob_t *library)
 {
@@ -159,7 +161,7 @@ int add_library(blob_t *stage3, char *name, blob_t *library)
 		library_ptr = (struct libraries *)(stage3->blob + stage3_libraries_offset);
 	}
 
-	if(strlen(name) > 31) crash();
+	if(strlen(name) > 63) crash();
 	strcpy(library_ptr->name, name);
 	library_ptr->first_mmap = library->blob;
 	

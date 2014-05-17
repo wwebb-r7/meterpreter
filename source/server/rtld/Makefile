@@ -22,8 +22,8 @@ debug: all
 gzip2raw: gzip2raw.c
 	gcc -Wall -ggdb -O2 gzip2raw.c -o gzip2raw
 
-stage3: gzip2raw stage3.c
-	$(CROSS)gcc -Wall -ggdb -O2 -pie -fPIC -Wl,--dynamic-list=symbols -o stage3 stage3.c
+stage3: gzip2raw stage3.c elfloader.o
+	$(CROSS)gcc -Wall -ggdb -O2 -pie -fPIC -Wl,--dynamic-list=symbols -o stage3 stage3.c elfloader.o
 	([ "$(DEBUG)" != "true" ] && $(STRIP) --strip-debug stage3) || true
 	gzip -9nfc < stage3 >stage3.gz
 	./gzip2raw stage3.gz stage3.raw
@@ -40,6 +40,7 @@ stage3: gzip2raw stage3.c
 	@echo "#define stage3_trap_handler_offset (0x`objdump -t stage3 | egrep text.*trap_handler | cut -d' ' -f1 `)" >> stage3.h
 	@echo "#define stage3_detours_offset (0x`objdump -t stage3 | egrep bss.*detours | cut -d' ' -f1 `)" >> stage3.h
 	@echo "#define stage3_libraries_offset (0x`objdump -t stage3 | egrep bss.*libraries | cut -d' ' -f1 `)" >> stage3.h
+	@echo "#define stage3_loader_info_offset (0x`objdump -t stage3 | egrep bss.*loader_info | cut -d' ' -f1 `)" >> stage3.h
 	rm stage3.raw stage3.gz
 
 %.o: $(compiled)/%.so
