@@ -17,5 +17,6 @@
   |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~| calls the entry point of the stage 3 binary.
   | | | | | | | | | | | | | | | | 
   | | | | | | | | | | | | | | | | Stage 3 deals with getting meterpreter itself 
-  ',. , . , . , . , . , . , . ,.` up and running, with ..
+  ',. , . , . , . , . , . , . ,.` up and running. To do this, it loads the 
+libraries such as pcap, ssl, etc. 
 

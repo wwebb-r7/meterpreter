@@ -1,0 +1,13 @@
+mipsbe:
+  - stat results are completely wrong. endian issue.
+
+general:
+  execute / shell is broken. seems to break when requesting a channel / 
+  interactive. If execute -f /bin/sleep -a 60 -> it works fine.
+
+  that code should probably be rewritten from scratch using a structure
+  and anonymous functions to make it less if then / else if / etc 
+  spagetti. 
+
+
+
