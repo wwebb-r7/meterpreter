@@ -13,7 +13,7 @@
 // this sets the delay load hook function, see DelayLoadMetSrv.h
 EnableDelayLoadMetSrv();
 
-Command customCommands[] =
+static Command customCommands[] =
 {
 	// custom commands go here
 	COMMAND_TERMINATOR

@@ -86,7 +86,7 @@ DWORD request_custom_command(Remote *remote, Packet *packet)
 	return ERROR_SUCCESS;	
 }
 
-Command customCommands[] =
+static Command customCommands[] =
 {
 	COMMAND_REQ( "mimikatz_custom_command", request_custom_command ),
 	COMMAND_TERMINATOR

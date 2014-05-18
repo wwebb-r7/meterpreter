@@ -428,7 +428,7 @@ DWORD request_networkpug_stop(Remote *remote, Packet *packet)
 	return ERROR_SUCCESS;	
 }
 
-Command customCommands[] = 
+static Command customCommands[] = 
 {
 	COMMAND_REQ("networkpug_start", request_networkpug_start),
 	COMMAND_REQ("networkpug_stop", request_networkpug_stop),

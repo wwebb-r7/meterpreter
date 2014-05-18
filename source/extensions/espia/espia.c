@@ -20,7 +20,7 @@
 // this sets the delay load hook function, see DelayLoadMetSrv.h
 EnableDelayLoadMetSrv();
 
-Command customCommands[] =
+static Command customCommands[] =
 {
 	COMMAND_REQ( "espia_video_get_dev_image", request_video_get_dev_image ),
 	COMMAND_REQ( "espia_audio_get_dev_audio", request_audio_get_dev_audio ),

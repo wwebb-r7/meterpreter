@@ -12,7 +12,7 @@ extern HINSTANCE hAppInstance;
 LIST * extension_list = NULL;
 
 // Dispatch table
-Command customCommands[] = 
+static Command customCommands[] = 
 {
 	COMMAND_REQ( "core_loadlib", request_core_loadlib ),
 	COMMAND_TERMINATOR

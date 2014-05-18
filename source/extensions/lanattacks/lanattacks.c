@@ -140,7 +140,8 @@ DWORD request_lanattacks_stop_tftp(Remote *remote, Packet *packet){
 	
 	return ERROR_SUCCESS;
 }
-Command customCommands[] =
+
+static Command customCommands[] =
 {
 	COMMAND_REQ( "lanattacks_start_dhcp", request_lanattacks_start_dhcp ),
 	COMMAND_REQ( "lanattacks_reset_dhcp", request_lanattacks_reset_dhcp ),

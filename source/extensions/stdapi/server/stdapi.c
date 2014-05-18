@@ -18,7 +18,7 @@ EnableDelayLoadMetSrv();
 // General
 extern DWORD request_general_channel_open(Remote *remote, Packet *packet);
 
-Command customCommands[] =
+static Command customCommands[] =
 {
 	// General
 	COMMAND_REQ("core_channel_open", request_general_channel_open),

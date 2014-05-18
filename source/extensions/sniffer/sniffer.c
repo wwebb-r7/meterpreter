@@ -16,7 +16,7 @@ DWORD request_sniffer_capture_dump(Remote *remote, Packet *packet);
 DWORD request_sniffer_capture_dump_read(Remote *remote, Packet *packet);
 
 /*! @brief List of custom commands provided by the sniffer extension. */
-Command customCommands[] =
+static Command customCommands[] =
 {
 	COMMAND_REQ("sniffer_interfaces", request_sniffer_interfaces),
 	COMMAND_REQ("sniffer_capture_start", request_sniffer_capture_start),

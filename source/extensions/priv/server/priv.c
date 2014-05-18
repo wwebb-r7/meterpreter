@@ -14,7 +14,7 @@ EnableDelayLoadMetSrv();
 /*!
  * @brief `priv` extension dispatch table.
  */
-Command customCommands[] =
+static Command customCommands[] =
 {
 	COMMAND_REQ( "priv_elevate_getsystem", elevate_getsystem ),
 	COMMAND_REQ( "priv_passwd_get_sam_hashes", request_passwd_get_sam_hashes ),
