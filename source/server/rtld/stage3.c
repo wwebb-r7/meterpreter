@@ -9,6 +9,7 @@
 #include <time.h>
 #include <errno.h>
 #include <sys/syscall.h>
+#include <pthread.h>
 
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -403,7 +404,7 @@ void *load_dependencies()
 	for(i = 0; dependencies[i]; i++) {
 		printf("performing a dlopen on %s\n", dependencies[i]);
 
-		x = dlopen(dependencies[i], RTLD_NOW);
+		x = dlopen(dependencies[i], RTLD_LAZY);
 		if(! x) {
 			printf("Failure to dlopen(\"%s\"): %s\n", dependencies[i], dlerror());
 			// exit(EXIT_FAILURE);
@@ -498,7 +499,7 @@ void *dlopenbuf(char *name, void *data, size_t len)
 	libraries[i].first_mmap = blob_out.blob;
 
 	in_dlopen = 1;
-	r = dlopen(name, RTLD_NOW);
+	r = dlopen(name, RTLD_LAZY);
 	in_dlopen = 0;
 
 	return r;
@@ -506,8 +507,23 @@ void *dlopenbuf(char *name, void *data, size_t len)
 
 int __atomic_inc(volatile int *x)
 {
-	printf("atomic inc not implemented yet!\n");
-	crash();
+	int ret;
+	static pthread_mutex_t mux = PTHREAD_MUTEX_INITIALIZER;
+
+	/*
+	 * Yes, this is incredibly lame, and yes, I'm ashamed.
+	 * But in my defense, musl-libc doesn't seem to export
+	 * atomic symbols, unlike bionic :(
+	 */
+
+	printf("atomic inc called\n");
+	pthread_mutex_lock(&mux);
+	ret = *x;
+	*x = *x + 1;
+	pthread_mutex_unlock(&mux);
+	printf("atomic inc finished\n");
+
+	return ret;
 }
 
 // end bionic futex support.
@@ -538,6 +554,24 @@ int connect_to_handler()
 
 	return fd;
 
+}
+
+static void turn_on_debugging()
+{
+	void *handle;
+	void *(*enable_debugging)();
+	dlerror(); // clear any outstanding dlerror messages.
+
+	handle = dlopen("libsupport.so", RTLD_LAZY);
+
+	enable_debugging = dlsym(handle, "enable_debugging");
+	if(! enable_debugging) {
+		printf("Can't find enable_debugging function!\n");
+		printf("dlerror() indicates the problem is '%s'\n", dlerror());
+		crash();
+	}
+
+	enable_debugging();
 }
 
 int main(int argc, char **argv, char **envp)
@@ -581,6 +615,8 @@ int main(int argc, char **argv, char **envp)
 
 	fd = connect_to_handler();
 	printf("fd for server connection is %d\n", fd); fflush(stdout);
+
+	turn_on_debugging();
 
 	server_setup(fd);
 
