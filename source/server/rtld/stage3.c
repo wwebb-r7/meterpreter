@@ -19,6 +19,7 @@
 
 #include "elfloader.h"
 #include "blob.h"
+#include "platform.h"
 
 #define crash() do { \
   printf(":-( crash at %s:%d\n", __FILE__, __LINE__); \
@@ -35,12 +36,8 @@
 // Instead of function redirecting, is there a better way to do this?
 //
 
-#define HOOKED_FUNC_COUNT 6
-#define PLATFORM_OFFSET(x) (x)
-
 // pcap, crypto, ssl, support, metsrv, custom
 #define LIBRARY_COUNT 12
-
 
 #define OPEN_OFFSET  0
 #define CLOSE_OFFSET 1
@@ -49,10 +46,6 @@
 #define READ_OFFSET 4
 #define PREAD_OFFSET 5
 
-struct detours {
-	unsigned long addr;
-	unsigned long orig;
-};
 
 // must be in sync with stage1.c ..
 struct libraries {
@@ -250,49 +243,6 @@ void *my_mmap(int *emul, void *addr, size_t length, int prot, int flags, int fd,
 	}
 }
 
-void *platform_arg(mcontext_t *mctx, int param)
-{
-	if(param < 4) {
-		return (void *)(mctx->regs[4 + param] & 0xffffffff);
-	} else {
-		unsigned long *stack;
-		stack = (unsigned long *)(mctx->regs[30] & 0xffffffff);
-		return (void *)stack[4 + (param - 4)];
-	}
-}
-
-int platform_set_return_value(mcontext_t *mctx, void *value)
-{
-	mctx->regs[2] = value;
-	return 0;
-}
-
-int platform_perform_return(mcontext_t *mctx)
-{
-	mctx->pc = mctx->regs[31];
-	return 0;
-}
-
-int platform_continue_execution(mcontext_t *mctx, int idx)
-{
-	int top, bottom;
-
-	top = (detours[idx].orig >> 16) & 0xffff;
-	bottom = (detours[idx].orig) & 0xffff;
-
-	if(top != 0x3c1c) {
-		printf("I don't know how to handle detour %d\n", idx);
-		crash();
-	}
-
-	// emulate lui gp modification
-	mctx->regs[28] = (bottom << 16);
-
-	mctx->pc += 4;
-
-	return 0;
-}
-
 void trap_handler(int sig, siginfo_t *info, void *_ctx)
 {
 	int i;
@@ -319,7 +269,7 @@ void trap_handler(int sig, siginfo_t *info, void *_ctx)
 #endif
 
 	for(i = 0; i < HOOKED_FUNC_COUNT; i++) {
-		if(detours[i].addr == PLATFORM_OFFSET(mctx->pc)) {
+		if(detours[i].addr == PLATFORM_OFFSET(PLATFORM_PC_REG(mctx))) {
 			printf("--> found offset at %d! <--\n", i);
 			break;
 		}
@@ -526,7 +476,7 @@ int __atomic_inc(volatile int *x)
 	return ret;
 }
 
-// end bionic futex support.
+// end bionic support.
 
 #define HOST "10.0.2.3"
 #define PORT 4444

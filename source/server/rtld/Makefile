@@ -22,8 +22,11 @@ debug: all
 gzip2raw: gzip2raw.c
 	gcc -Wall -ggdb -O2 gzip2raw.c -o gzip2raw
 
-stage3: gzip2raw stage3.c elfloader.o
-	$(CROSS)gcc -Wall -ggdb -O2 -pie -fPIC -Wl,--dynamic-list=symbols -o stage3 stage3.c elfloader.o
+platform.o: platform.h
+	$(CROSS)gcc $(CFLAGS) -c platform.c
+
+stage3: gzip2raw stage3.c elfloader.o platform.o
+	$(CROSS)gcc -Wall -ggdb -O2 -pie -fPIC -Wl,--dynamic-list=symbols -o stage3 stage3.c elfloader.o platform.o
 	([ "$(DEBUG)" != "true" ] && $(STRIP) --strip-debug stage3) || true
 	gzip -9nfc < stage3 >stage3.gz
 	./gzip2raw stage3.gz stage3.raw
