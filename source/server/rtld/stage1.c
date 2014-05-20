@@ -26,6 +26,7 @@
 #include "crash.h"
 #include "elfloader.h"
 #include "blob.h"
+#include "platform.h"
 
 void reset_signal_handlers();
 void cleanup_fd();
@@ -188,32 +189,32 @@ int setup_detours(blob_t *libc, blob_t *stage3)
 	fp = (unsigned int *)(libc->blob + libc_open_offset);  
 	*detours++ = (unsigned int)(fp);
 	*detours++ = *fp;
-	*fp = 0x0000000d;
+	PLATFORM_TRAP(fp);
 
 	fp = (unsigned int *)(libc->blob + libc_close_offset); 
 	*detours++ = (unsigned int)(fp);
 	*detours++ = *fp;
-	*fp = 0x0000000d;
+	PLATFORM_TRAP(fp);
 
 	fp = (unsigned int *)(libc->blob + libc_mmap_offset);
 	*detours++ = (unsigned int)(fp);
 	*detours++ = *fp;
-	*fp = 0x0000000d;
+	PLATFORM_TRAP(fp);
 
 	fp = (unsigned int *)(libc->blob + libc_fstat_offset);
 	*detours++ = (unsigned int)(fp);
 	*detours++ = *fp;
-	*fp = 0x0000000d;
+	PLATFORM_TRAP(fp);
 
 	fp = (unsigned int *)(libc->blob + libc_read_offset);
 	*detours++ = (unsigned int)(fp);
 	*detours++ = *fp;
-	*fp = 0x0000000d;
+	PLATFORM_TRAP(fp);
 
 	fp = (unsigned int *)(libc->blob + libc_pread_offset);
 	*detours++ = (unsigned int)(fp);
 	*detours++ = *fp;
-	*fp = 0x0000000d;
+	PLATFORM_TRAP(fp);
 
 	printf("detours setup\n");
 	return 0;

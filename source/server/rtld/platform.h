@@ -18,6 +18,10 @@ extern struct detours detours[HOOKED_FUNC_COUNT];
 
 #define PLATFORM_PC_REG(x) (x->pc)
 #define PLATFORM_OFFSET(x) (x)
+#define PLATFORM_TRAP(ptr) \
+	do { \
+		(*ptr) = 0x0000000d; \
+	} while(0)
 
 void *platform_arg(mcontext_t *mctx, int param);
 int platform_set_return_value(mcontext_t *mctx, void *value);
