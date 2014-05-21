@@ -182,7 +182,7 @@ int setup_detours(blob_t *libc, blob_t *stage3)
 
 	sa.sa_flags = SA_SIGINFO;
 	sa.sa_sigaction = (void *)(stage3->blob + stage3_trap_handler_offset);
-	sigaction(SIGTRAP, &sa, NULL);
+	sigaction(PLATFORM_TRAP_SIGNAL, &sa, NULL);
 
 	detours = (unsigned int *)(stage3->blob + stage3_detours_offset);
 
@@ -223,7 +223,9 @@ int setup_detours(blob_t *libc, blob_t *stage3)
 void and_jump(blob_t *stack_blob, blob_t *libc_blob)
 {
 	Elf32_Ehdr *ehdr;
+	ehdr = (Elf32_Ehdr *)(libc_blob->blob);
 
+#ifdef __mips__
 	register int (*entry)() asm("t9");
 	register int *(*sp) asm("sp");
 	// Where does Napolean keep his armies? In his sleevies.
@@ -233,6 +235,15 @@ void and_jump(blob_t *stack_blob, blob_t *libc_blob)
 	sp = (int *) stack_blob->blob;
 
 	entry();
+#elif __arm__
+	register int (*entry)() asm("r0");
+	register int *(*sp) asm("sp");
+
+	entry = (int)(libc_blob->blob + ehdr->e_entry);
+	sp = (int *) stack_blob->blob;
+
+	entry();
+#endif
 
 	printf("hmmm. And libc returned back to us :/\n"); fflush(stdout);
 	crash();

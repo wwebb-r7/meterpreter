@@ -20,12 +20,7 @@
 #include "elfloader.h"
 #include "blob.h"
 #include "platform.h"
-
-#define crash() do { \
-  printf(":-( crash at %s:%d\n", __FILE__, __LINE__); \
-  fflush(stdout); \
-  (*(unsigned char *)NULL) = 0xff; \
-} while (0)
+#include "crash.h"
 
 //
 // open()    syscall()
@@ -46,6 +41,11 @@
 #define READ_OFFSET 4
 #define PREAD_OFFSET 5
 
+char *library_calls[] = {
+	"open", "close", "mmap",
+	"fstat", "read", "pread",
+	NULL
+};
 
 // must be in sync with stage1.c ..
 struct libraries {
@@ -255,7 +255,8 @@ void trap_handler(int sig, siginfo_t *info, void *_ctx)
 	ret = NULL;
 	emulated = 0;
 
-#if 0
+#if 1
+#ifdef __mips__
 	printf("PC is %08x\n", mctx->pc);
 	for(i = 0; i < 32; i++) {
 		printf("reg[%d] is %016llx, fpreg[%d] is %016llx\n", i, mctx->regs[i], i, mctx->fpregs[i]);
@@ -267,10 +268,25 @@ void trap_handler(int sig, siginfo_t *info, void *_ctx)
 	}
 
 #endif
+#ifdef __arm__
+        // unsigned long trap_no, error_code, oldmask;
+        // unsigned long arm_r0, arm_r1, arm_r2, arm_r3;
+        // unsigned long arm_r4, arm_r5, arm_r6, arm_r7;
+        // unsigned long arm_r8, arm_r9, arm_r10, arm_fp;
+        // unsigned long arm_ip, arm_sp, arm_lr, arm_pc;
+        // unsigned long arm_cpsr, fault_address;
+	printf("trap_no: %08x, error_code: %08x, oldmask: %08x\n", mctx->trap_no, mctx->error_code, mctx->oldmask);
+	printf("r0: %08x, r1: %08x, r2: %08x, r3: %08x\n", mctx->arm_r0, mctx->arm_r1, mctx->arm_r2, mctx->arm_r3);
+	printf("r4: %08x, r5: %08x, r6: %08x, r7: %08x\n", mctx->arm_r4, mctx->arm_r5, mctx->arm_r6, mctx->arm_r7);
+	printf("r8: %08x, r9: %08x, 10: %08x, fp: %08x\n", mctx->arm_r8, mctx->arm_r9, mctx->arm_r10, mctx->arm_fp);
+	printf("ip: %08x, sp: %08x, lr: %08x, pc: %08x\n", mctx->arm_ip, mctx->arm_sp, mctx->arm_lr, mctx->arm_pc);
+	printf("cpsr: %08x, fault: %08x\n", mctx->arm_cpsr, mctx->fault_address);
+#endif
+#endif
 
 	for(i = 0; i < HOOKED_FUNC_COUNT; i++) {
 		if(detours[i].addr == PLATFORM_OFFSET(PLATFORM_PC_REG(mctx))) {
-			printf("--> found offset at %d! <--\n", i);
+			printf("--> found offset at %d, which is %s! <--\n", i, library_calls[i]);
 			break;
 		}
 	}

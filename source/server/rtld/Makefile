@@ -27,11 +27,11 @@ platform.o: platform.h
 
 stage3: gzip2raw stage3.c elfloader.o platform.o
 	$(CROSS)gcc -Wall -ggdb -O2 -pie -fPIC -Wl,--dynamic-list=symbols -o stage3 stage3.c elfloader.o platform.o
-	([ "$(DEBUG)" != "true" ] && $(STRIP) --strip-debug stage3) || true
+	([ "$(DEBUG)" != "true" ] && $(CROSS)strip --strip-debug stage3) || true
 	gzip -9nfc < stage3 >stage3.gz
 	./gzip2raw stage3.gz stage3.raw
-	$(CROSS)objcopy -I binary -O elf32-tradbigmips \
-		--binary-architecture=mips \
+	$(CROSS)objcopy -I binary -O elf32-littlearm \
+		--binary-architecture=arm \
 		--redefine-sym _binary_stage3_raw_start=stage3_start \
 		--redefine-sym _binary_stage3_raw_end=stage3_end \
 		--redefine-sym _binary_stage3_raw_size=stage3_size \
@@ -52,8 +52,8 @@ stage3: gzip2raw stage3.c elfloader.o platform.o
 	([ "$(DEBUG)" != "true" ] && $(CROSS)strip --strip-debug tmp/$(*).tmp) || true
 	gzip -9nfc < tmp/$(*).tmp >tmp/$(*).gz
 	./gzip2raw tmp/$(*).gz tmp/$(*).raw
-	$(CROSS)objcopy -I binary -O elf32-tradbigmips \
-		--binary-architecture=mips \
+	$(CROSS)objcopy -I binary -O elf32-littlearm \
+		--binary-architecture=arm \
 		--redefine-sym _binary_tmp_$*_raw_start=$*_start \
 		--redefine-sym _binary_tmp_$*_raw_end=$*_end \
 		--redefine-sym _binary_tmp_$*_raw_size=$*_size \
@@ -92,7 +92,7 @@ stage1: $(LIBOBJECTS) $(OBJ) stage1.c stage1.o stage3.o libc_offsets.h stage3 bl
 
 clean:
 	rm -f $(OBJECTS)
-	rm -f lib*.h
+	rm -f lib*.h stage3.h
 	rm -f *.o
 
 .PHONY: clean

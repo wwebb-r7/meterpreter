@@ -21,7 +21,6 @@ ROOT=$(basename $(CURDIR:%/=%))
 
 COMPILED=${ROOT}/${build_tmp}/compiled
 
-#objects  = $(COMPILED)/libc.so
 objects = $(COMPILED)/libpcap.so
 objects += $(COMPILED)/libcrypto.so
 objects += $(COMPILED)/libssl.so
@@ -52,16 +51,16 @@ dependencies: $(build_dep)
 	[ -f $(build_dep)/openssl-1.0.1g.tar.gz ] || wget -O $(build_dep)/openssl-1.0.1g.tar.gz https://www.openssl.org/source/openssl-1.0.1g.tar.gz
 	[ -f $(build_dep)/libpcap-1.5.3.tar.gz ] || wget -O $(build_dep)/libpcap-1.5.3.tar.gz http://www.tcpdump.org/release/libpcap-1.5.3.tar.gz
 	[ -f $(build_dep)/crossx86-mips-linux-musl-1.0.0.tar.xz ] || wget -O $(build_dep)/crossx86-mips-linux-musl-1.0.0.tar.xz https://googledrive.com/host/0BwnS5DMB0YQ6bDhPZkpOYVFhbk0/musl-1.0.0/crossx86-mips-linux-musl-1.0.0.tar.xz
+	[ -f $(build_dep)/crossx86-arm-linux-musleabi-1.0.0.tar.xz ] || wget -O $(build_dep)/crossx86-arm-linux-musleabi-1.0.0.tar.xz https://googledrive.com/host/0BwnS5DMB0YQ6bDhPZkpOYVFhbk0/musl-1.0.0/crossx86-arm-linux-musleabi-1.0.0.tar.xz
 
-extract_mips:
-	# tar xJvf ../posix-meterp-build-dep/crossx86-mips-linux-musl-1.0.0.tar.xz mips-linux-musl/
+extract_mips_compiler:
+	[ -d $(build_tmp)/mips-linux-musl ] || tar xJvf $(build_dep)/crossx86-mips-linux-musl-1.0.0.tar.xz -C $(build_tmp)
 
-$(COMPILED): dependencies extract_mips build_tmp
+extract_arm_compiler:
+	[ -d $(build_tmp)/arm-linux-musleabi ] || tar xJvf $(build_dep)/crossx86-arm-linux-musleabi-1.0.0.tar.xz -C $(build_tmp)
+
+$(COMPILED): dependencies extract_mips_compiler extract_arm_compiler build_tmp
 	[ -d $(COMPILED)/ ] || mkdir $(COMPILED)/
-
-$(COMPILED)/libc.so: $(COMPILED)
-	(cd ${ROOT}/source/musl ; ./configure --prefix=${COMPILED}/musl --syslibdir=${COMPILED}/musl --enable-gcc-wrapper ; make && make install )
-	cp ${COMPILED}/musl/lib/libc.so ${COMPILED}/libc.so
 
 $(COMPILED)/libcrypto.so: $(build_tmp)/openssl-1.0.1g/libssl.so
 	cp $(build_tmp)/openssl-1.0.1g/libcrypto.so $(COMPILED)/libcrypto.so
@@ -99,7 +98,7 @@ $(build_tmp)/libpcap-1.5.3/libpcap.so.1.5.3:
 data/meterpreter/msflinker_linux_x86.bin: source/server/rtld/msflinker.bin
 	cp source/server/rtld/msflinker.bin data/meterpreter/msflinker_linux_x86.bin
 
-source/server/rtld/msflinker.bin: $(COMPILED)/libc.so
+source/server/rtld/msflinker.bin:
 	$(MAKE) -C source/server/rtld
 
 $(workspace)/metsrv/libmetsrv_main.so: $(COMPILED)/libsupport.so
