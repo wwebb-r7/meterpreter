@@ -51,6 +51,18 @@ extern struct detours detours[HOOKED_FUNC_COUNT];
 
 #endif // __powerpc__
 
+#ifdef __x86_64__
+
+#define PLATFORM_PC_REG(x) (x->gregs[REG_RIP])
+#define PLATFORM_OFFSET(x) (x - 1)
+
+#define PLATFORM_TRAP(ptr) \
+	do { \
+		(*ptr) = (((*ptr) & (~0xff)) | 0xcc); \
+	} while(0)
+
+#endif
+
 #ifndef PLATFORM_OFFSET
 #define PLATFORM_OFFSET(x) (x)
 #endif

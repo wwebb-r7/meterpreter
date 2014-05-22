@@ -37,7 +37,8 @@ int add_library(blob_t *stage3, char *name, blob_t *library);
 void copy_loader_struct(blob_t *stage3, loader_t *loader);
 
 #define STACK_SIZE (1024 * 1024)
-#define LOADER_SIZE ((1024 * 1024) * 8)
+// #define LOADER_SIZE ((1024 * 1024) * 8) // for 32 bits.
+#define LOADER_SIZE ((1024 * 1024) * 64) // for 64 bits ..
 
 int main(int argc, char **argv)
 {
@@ -175,8 +176,8 @@ int add_library(blob_t *stage3, char *name, blob_t *library)
 int setup_detours(blob_t *libc, blob_t *stage3)
 {
 	struct sigaction sa;
-	unsigned int *fp;
-	unsigned int *detours;
+	unsigned long *fp;
+	unsigned long *detours;
 
 	memset(&sa, 0, sizeof(struct sigaction));
 
@@ -184,35 +185,35 @@ int setup_detours(blob_t *libc, blob_t *stage3)
 	sa.sa_sigaction = (void *)(stage3->blob + stage3_trap_handler_offset);
 	sigaction(PLATFORM_TRAP_SIGNAL, &sa, NULL);
 
-	detours = (unsigned int *)(stage3->blob + stage3_detours_offset);
+	detours = (unsigned long *)(stage3->blob + stage3_detours_offset);
 
-	fp = (unsigned int *)(libc->blob + libc_open_offset);  
-	*detours++ = (unsigned int)(fp);
+	fp = (unsigned long *)(libc->blob + libc_open_offset);
+	*detours++ = (unsigned long)(fp);
 	*detours++ = *fp;
 	PLATFORM_TRAP(fp);
 
-	fp = (unsigned int *)(libc->blob + libc_close_offset); 
-	*detours++ = (unsigned int)(fp);
+	fp = (unsigned long *)(libc->blob + libc_close_offset);
+	*detours++ = (unsigned long)(fp);
 	*detours++ = *fp;
 	PLATFORM_TRAP(fp);
 
-	fp = (unsigned int *)(libc->blob + libc_mmap_offset);
-	*detours++ = (unsigned int)(fp);
+	fp = (unsigned long *)(libc->blob + libc_mmap_offset);
+	*detours++ = (unsigned long)(fp);
 	*detours++ = *fp;
 	PLATFORM_TRAP(fp);
 
-	fp = (unsigned int *)(libc->blob + libc_fstat_offset);
-	*detours++ = (unsigned int)(fp);
+	fp = (unsigned long *)(libc->blob + libc_fstat_offset);
+	*detours++ = (unsigned long)(fp);
 	*detours++ = *fp;
 	PLATFORM_TRAP(fp);
 
-	fp = (unsigned int *)(libc->blob + libc_read_offset);
-	*detours++ = (unsigned int)(fp);
+	fp = (unsigned long *)(libc->blob + libc_read_offset);
+	*detours++ = (unsigned long)(fp);
 	*detours++ = *fp;
 	PLATFORM_TRAP(fp);
 
-	fp = (unsigned int *)(libc->blob + libc_pread_offset);
-	*detours++ = (unsigned int)(fp);
+	fp = (unsigned long *)(libc->blob + libc_pread_offset);
+	*detours++ = (unsigned long )(fp);
 	*detours++ = *fp;
 	PLATFORM_TRAP(fp);
 
@@ -223,14 +224,14 @@ int setup_detours(blob_t *libc, blob_t *stage3)
 void and_jump(blob_t *stack_blob, blob_t *libc_blob)
 {
 	// Where does Napolean keep his armies? In his sleevies.
-	Elf32_Ehdr *ehdr;
-	ehdr = (Elf32_Ehdr *)(libc_blob->blob);
+	Ehdr *ehdr;
+	ehdr = (Ehdr *)(libc_blob->blob);
 
 #ifdef __mips__
 	register int (*entry)() asm("t9");
 	register int *(*sp) asm("sp");
 
-	ehdr = (Elf32_Ehdr *)(libc_blob->blob);
+	ehdr = (Ehdr *)(libc_blob->blob);
 	entry = (int)(libc_blob->blob + ehdr->e_entry);
 	sp = (int *) stack_blob->blob;
 
@@ -251,7 +252,19 @@ void and_jump(blob_t *stack_blob, blob_t *libc_blob)
 	sp = (int *) stack_blob->blob;
 
 	entry();
+#elif __x86_64__
+	// this code isn't -fomit-frame-pointer friendly ..
+
+	register long (*entry)() asm ("rax");
+	register long *(*sp) asm("rsp");
+
+	sp = (long *) stack_blob->blob;
+	entry = (long)(libc_blob->blob + ehdr->e_entry);
+
+	// calling will mess up our stack ..
+	asm("jmpq *%rax;");
 #endif
+
 
 	printf("hmmm. And libc returned back to us :/\n"); fflush(stdout);
 	crash();
@@ -259,20 +272,20 @@ void and_jump(blob_t *stack_blob, blob_t *libc_blob)
 
 int setup_stack(blob_t *stack, blob_t *libc, blob_t *stage3) 
 {
-	unsigned int *ptr, *argv, *envp, *tmp;
+	unsigned long *ptr, *argv, *envp, *tmp;
 	unsigned char *p;
-	Elf32_Ehdr *ehdr;
-	Elf32_Phdr *phdr;
+	Ehdr *ehdr;
+	Phdr *phdr;
 
 	printf("--> setup_stack %p, %p, %p\n", stack, libc, stage3); fflush(stdout);
 	printf("--> libc->blob = %p\n", libc->blob);
 	printf("--> stage3->blob = %p\n", stage3->blob);
 
-	ehdr = (Elf32_Ehdr *)(stage3->blob);
-	phdr = (Elf32_Phdr *)(stage3->blob + ehdr->e_phoff);
+	ehdr = (Ehdr *)(stage3->blob);
+	phdr = (Phdr *)(stage3->blob + ehdr->e_phoff);
 
 	stack->blob += (STACK_SIZE - 4096);
-	ptr = (unsigned int *)(stack->blob);
+	ptr = (unsigned long *)(stack->blob);
 
 	// *ptr++ = 0; // return address
 	*ptr++ = 1; // argc
@@ -283,7 +296,7 @@ int setup_stack(blob_t *stack, blob_t *libc, blob_t *stage3)
 	ptr ++;
 	*ptr++ = 0;
 
-#define set_auxv(key, value) do { *ptr++ = (unsigned int)(key); *ptr++ = (unsigned int)(value); } while(0)
+#define set_auxv(key, value) do { *ptr++ = (unsigned long)(key); *ptr++ = (unsigned long)(value); } while(0)
 	set_auxv(AT_UID, 0);
 	set_auxv(AT_EUID, 0);
 	set_auxv(AT_GID, 0);
@@ -309,10 +322,10 @@ int setup_stack(blob_t *stack, blob_t *libc, blob_t *stage3)
 #undef set_auxv
 
 	p = (unsigned char *)(ptr);
-	*argv = (unsigned int)(ptr);
+	*argv = (unsigned long)(ptr);
 	strcpy((char *)p, "argv0");
 	p += 6;
-	*envp = (unsigned int)(p);
+	*envp = (unsigned long)(p);
 	strcpy((char *)p, "LD_LIBRARY_PATH=/nx");
 	p += 6;
 

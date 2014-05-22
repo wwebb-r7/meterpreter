@@ -82,6 +82,7 @@ void *my_open(int *emul, char *name, int flags, mode_t mode)
 	int ret;
 
 	printf("my_open(\"%s\", %d, %o)\n", name, flags, mode);
+	fflush(stdout);
 
 	for(i = 0; i < LIBRARY_COUNT; i++) {
 		printf("%s vs %s\n", libraries[i].name, name);
@@ -291,6 +292,24 @@ void trap_handler(int sig, siginfo_t *info, void *_ctx)
 		);	
 	}
 #endif
+#ifdef __x86_64__
+	// typedef unsigned long greg_t, gregset_t[48];
+	for(i = 0; i < (sizeof(mctx->gregs) / sizeof(unsigned long)); i+=4) {
+		printf("%02d: 0x%016llx, %02d: 0x%016llx, %02d: 0x%016llx, %02x: 0x%016llx\n",
+			i, mctx->gregs[i], i+1, mctx->gregs[i+1],
+			i+2, mctx->gregs[i+2], i+3, mctx->gregs[i+3]
+		);
+	}
+#endif
+
+	printf("First three arguments are as follows\n");
+	printf("0x%llx 0x%llx 0x%llx\n",
+		platform_arg(mctx, 0),
+		platform_arg(mctx, 1),
+		platform_arg(mctx, 2)
+	);
+	fflush(stdout);
+
 #endif
 
 	for(i = 0; i < HOOKED_FUNC_COUNT; i++) {
@@ -552,10 +571,12 @@ static void turn_on_debugging()
 int main(int argc, char **argv, char **envp)
 {
 	void *x;
-	int (*server_setup)(int socket);
+	long (*server_setup)(int socket);
 	int fd;
 
 	// setvbuf(stdout, NULL, 0, _IONBF);
+
+	printf("--> stage3 activated <--\n"); fflush(stdout);
 
 	x = load_dependencies();
 
@@ -592,6 +613,9 @@ int main(int argc, char **argv, char **envp)
 	printf("fd for server connection is %d\n", fd); fflush(stdout);
 
 	turn_on_debugging();
+
+	printf("--> calling server setup <--\n");
+	fflush(stdout);
 
 	server_setup(fd);
 

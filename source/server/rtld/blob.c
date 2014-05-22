@@ -22,7 +22,7 @@ struct zliballoc {
 	unsigned char *prev;
 };
 
-#define MIN_HINT_SIZE (((32 * 16) * 1024))
+#define MIN_HINT_SIZE (1024 * 1024)
 
 // Initialize the zliballoc structure
 static int init_zliballoc(struct zliballoc *za, size_t hint)

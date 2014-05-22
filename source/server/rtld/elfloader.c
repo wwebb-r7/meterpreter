@@ -31,8 +31,8 @@ int loader_alloc(loader_t *loader, size_t sz)
 
 int load_elf_blob(loader_t *loader, blob_t *blob_in, blob_t *blob_out)
 {
-	Elf32_Ehdr *ehdr;
-	Elf32_Phdr *phdr;
+	Ehdr *ehdr;
+	Phdr *phdr;
 	int i;
 	size_t filesz, memsz;
 	static int page_size;
@@ -41,8 +41,8 @@ int load_elf_blob(loader_t *loader, blob_t *blob_in, blob_t *blob_out)
 		page_size = sysconf(_SC_PAGESIZE);
 	}
 
-	ehdr = (Elf32_Ehdr *)blob_in->blob;
-	phdr = (Elf32_Phdr *)(blob_in->blob + ehdr->e_phoff);
+	ehdr = (Ehdr *)blob_in->blob;
+	phdr = (Phdr *)(blob_in->blob + ehdr->e_phoff);
 
 	if((int)(loader->next) & (page_size-1)) crash();
 
@@ -102,7 +102,7 @@ int load_elf_blob(loader_t *loader, blob_t *blob_in, blob_t *blob_out)
 		dst = blob_out->blob + phdr->p_vaddr;
 		src = blob_in->blob + phdr->p_offset; // (phdr->p_offset & ~4096);
 	
-		printf("  memcpy(0x%08x, 0x%08x, %d)\n", dst, src, filesz);
+		printf("  memcpy(%p, %p, %d)\n", dst, src, filesz);
 
 		//memcpy(blob_out->blob + offsz, blob_in->blob + (phdr->p_offset & ~4095), filesz);
 		memcpy(dst, src, filesz);

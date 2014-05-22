@@ -31,8 +31,9 @@ stage3: gzip2raw stage3.c elfloader.o platform.o
 	gzip -9nfc < stage3 >stage3.gz
 	./gzip2raw stage3.gz stage3.raw
 	# arm, mips -- elf32-littlearm ..
-	$(CROSS)objcopy -I binary -O elf32-powerpc \
-		--binary-architecture=powerpc \
+	# 
+	$(CROSS)objcopy -I binary -O elf64-x86-64 \
+		--binary-architecture=i386 \
 		--redefine-sym _binary_stage3_raw_start=stage3_start \
 		--redefine-sym _binary_stage3_raw_end=stage3_end \
 		--redefine-sym _binary_stage3_raw_size=stage3_size \
@@ -53,8 +54,8 @@ stage3: gzip2raw stage3.c elfloader.o platform.o
 	([ "$(DEBUG)" != "true" ] && $(CROSS)strip --strip-debug tmp/$(*).tmp) || true
 	gzip -9nfc < tmp/$(*).tmp >tmp/$(*).gz
 	./gzip2raw tmp/$(*).gz tmp/$(*).raw
-	$(CROSS)objcopy -I binary -O elf32-powerpc \
-		--binary-architecture=powerpc \
+	$(CROSS)objcopy -I binary -O elf64-x86-64 \
+		--binary-architecture=i386 \
 		--redefine-sym _binary_tmp_$*_raw_start=$*_start \
 		--redefine-sym _binary_tmp_$*_raw_end=$*_end \
 		--redefine-sym _binary_tmp_$*_raw_size=$*_size \

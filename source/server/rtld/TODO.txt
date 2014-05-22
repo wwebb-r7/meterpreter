@@ -5,6 +5,12 @@ general:
   execute / shell is broken. seems to break when requesting a channel / 
   interactive. If execute -f /bin/sleep -a 60 -> it works fine.
 
+  Phdr p_align being 2**21 on x86_64 and 2**16 on mipsbe leads to a lot of
+  wasted memory... perhaps there is a better way to allocate than single big
+  blobs, or perhaps it's possible to coerce gcc/ld to do 2**12 alignment
+  (or whatever is applicable) to reduce the amount of holes in the
+  allocations.
+
   that code should probably be rewritten from scratch using a structure
   and anonymous functions to make it less if then / else if / etc 
   spagetti. 

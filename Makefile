@@ -53,6 +53,7 @@ dependencies: $(build_dep)
 	[ -f $(build_dep)/crossx86-mips-linux-musl-1.0.0.tar.xz ] || wget -O $(build_dep)/crossx86-mips-linux-musl-1.0.0.tar.xz https://googledrive.com/host/0BwnS5DMB0YQ6bDhPZkpOYVFhbk0/musl-1.0.0/crossx86-mips-linux-musl-1.0.0.tar.xz
 	[ -f $(build_dep)/crossx86-arm-linux-musleabi-1.0.0.tar.xz ] || wget -O $(build_dep)/crossx86-arm-linux-musleabi-1.0.0.tar.xz https://googledrive.com/host/0BwnS5DMB0YQ6bDhPZkpOYVFhbk0/musl-1.0.0/crossx86-arm-linux-musleabi-1.0.0.tar.xz
 	[ -f $(build_dep)/crossx86-powerpc-linux-musl-1.0.0.tar.xz ] || wget -O $(build_dep)/crossx86-powerpc-linux-musl-1.0.0.tar.xz https://googledrive.com/host/0BwnS5DMB0YQ6bDhPZkpOYVFhbk0/musl-1.0.0/crossx86-powerpc-linux-musl-1.0.0.tar.xz
+	[ -f $(build_dep)/crossx86-x86_64-linux-musl-1.0.0.tar.xz ] || wget -O $(build_dep)/crossx86-x86_64-linux-musl-1.0.0.tar.xz https://googledrive.com/host/0BwnS5DMB0YQ6bDhPZkpOYVFhbk0/musl-1.0.0/crossx86-x86_64-linux-musl-1.0.0.tar.xz
 
 extract_mips_compiler:
 	[ -d $(build_tmp)/mips-linux-musl ] || tar xJvf $(build_dep)/crossx86-mips-linux-musl-1.0.0.tar.xz -C $(build_tmp)
@@ -61,7 +62,11 @@ extract_arm_compiler:
 	[ -d $(build_tmp)/arm-linux-musleabi ] || tar xJvf $(build_dep)/crossx86-arm-linux-musleabi-1.0.0.tar.xz -C $(build_tmp)
 
 extract_ppc_compiler:
-	[ -d $(build_tmp)/powerpc-linux-musl ] || tar xJvf $(build_dep)crossx86-powerpc-linux-musl-1.0.0.tar.xz -C $(build_tmp)
+	[ -d $(build_tmp)/powerpc-linux-musl ] || tar xJvf $(build_dep)/crossx86-powerpc-linux-musl-1.0.0.tar.xz -C $(build_tmp)
+
+extract_x86_64_compiler:
+	[ -d $(build_tmp)/x86_64-linux-musl ] || tar xJvf $(build_dep)/crossx86-x86_64-linux-musl-1.0.0.tar.xz -C $(build_tmp)
+
 
 $(COMPILED): dependencies extract_mips_compiler extract_arm_compiler extract_ppc_compiler build_tmp
 	[ -d $(COMPILED)/ ] || mkdir $(COMPILED)/
@@ -71,6 +76,8 @@ $(COMPILED)/libcrypto.so: $(build_tmp)/openssl-1.0.1g/libssl.so
 
 $(COMPILED)/libssl.so: $(build_tmp)/openssl-1.0.1g/libssl.so
 	cp $(build_tmp)/openssl-1.0.1g/libssl.so $(COMPILED)/libssl.so
+
+# linux-x86_64 needed for that for x86_64 ..
 
 $(build_tmp)/openssl-1.0.1g/libssl.so:
 	[ -d $(build_tmp) ] || mkdir $(build_tmp)
