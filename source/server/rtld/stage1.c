@@ -222,13 +222,13 @@ int setup_detours(blob_t *libc, blob_t *stage3)
 
 void and_jump(blob_t *stack_blob, blob_t *libc_blob)
 {
+	// Where does Napolean keep his armies? In his sleevies.
 	Elf32_Ehdr *ehdr;
 	ehdr = (Elf32_Ehdr *)(libc_blob->blob);
 
 #ifdef __mips__
 	register int (*entry)() asm("t9");
 	register int *(*sp) asm("sp");
-	// Where does Napolean keep his armies? In his sleevies.
 
 	ehdr = (Elf32_Ehdr *)(libc_blob->blob);
 	entry = (int)(libc_blob->blob + ehdr->e_entry);
@@ -238,6 +238,14 @@ void and_jump(blob_t *stack_blob, blob_t *libc_blob)
 #elif __arm__
 	register int (*entry)() asm("r0");
 	register int *(*sp) asm("sp");
+
+	entry = (int)(libc_blob->blob + ehdr->e_entry);
+	sp = (int *) stack_blob->blob;
+
+	entry();
+#elif __powerpc__
+	register int (*entry)() asm("r0");
+	register int *(*sp)() asm("sp");
 
 	entry = (int)(libc_blob->blob + ehdr->e_entry);
 	sp = (int *) stack_blob->blob;

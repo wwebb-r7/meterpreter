@@ -52,6 +52,7 @@ dependencies: $(build_dep)
 	[ -f $(build_dep)/libpcap-1.5.3.tar.gz ] || wget -O $(build_dep)/libpcap-1.5.3.tar.gz http://www.tcpdump.org/release/libpcap-1.5.3.tar.gz
 	[ -f $(build_dep)/crossx86-mips-linux-musl-1.0.0.tar.xz ] || wget -O $(build_dep)/crossx86-mips-linux-musl-1.0.0.tar.xz https://googledrive.com/host/0BwnS5DMB0YQ6bDhPZkpOYVFhbk0/musl-1.0.0/crossx86-mips-linux-musl-1.0.0.tar.xz
 	[ -f $(build_dep)/crossx86-arm-linux-musleabi-1.0.0.tar.xz ] || wget -O $(build_dep)/crossx86-arm-linux-musleabi-1.0.0.tar.xz https://googledrive.com/host/0BwnS5DMB0YQ6bDhPZkpOYVFhbk0/musl-1.0.0/crossx86-arm-linux-musleabi-1.0.0.tar.xz
+	[ -f $(build_dep)/crossx86-powerpc-linux-musl-1.0.0.tar.xz ] || wget -O $(build_dep)/crossx86-powerpc-linux-musl-1.0.0.tar.xz https://googledrive.com/host/0BwnS5DMB0YQ6bDhPZkpOYVFhbk0/musl-1.0.0/crossx86-powerpc-linux-musl-1.0.0.tar.xz
 
 extract_mips_compiler:
 	[ -d $(build_tmp)/mips-linux-musl ] || tar xJvf $(build_dep)/crossx86-mips-linux-musl-1.0.0.tar.xz -C $(build_tmp)
@@ -59,7 +60,10 @@ extract_mips_compiler:
 extract_arm_compiler:
 	[ -d $(build_tmp)/arm-linux-musleabi ] || tar xJvf $(build_dep)/crossx86-arm-linux-musleabi-1.0.0.tar.xz -C $(build_tmp)
 
-$(COMPILED): dependencies extract_mips_compiler extract_arm_compiler build_tmp
+extract_ppc_compiler:
+	[ -d $(build_tmp)/powerpc-linux-musl ] || tar xJvf $(build_dep)crossx86-powerpc-linux-musl-1.0.0.tar.xz -C $(build_tmp)
+
+$(COMPILED): dependencies extract_mips_compiler extract_arm_compiler extract_ppc_compiler build_tmp
 	[ -d $(COMPILED)/ ] || mkdir $(COMPILED)/
 
 $(COMPILED)/libcrypto.so: $(build_tmp)/openssl-1.0.1g/libssl.so

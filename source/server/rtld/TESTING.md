@@ -53,7 +53,12 @@ can be used to implement testing, I would imagine.
 
 ## Meterpreter Checklist
 
+- [ ] Payloads offer the ability to turn on debugging, others. (fork() would be a good idea)
+- [ ] Debugging log can be enabled, or disabled, and the /tmp/meterpreter.log.pid is created or not as expected.
 - [ ] stdapi library gets requested (no Failed to load extension exception)
+
+## stdapi Checklist
+
 - [ ] can use cat command to read a given file
 - [ ] can upload /etc/passwd /tmp/passwd -> ensure files are the same
 - [ ] can download /tmp/passwd /tmp/passwd -> ensure local /etc/passwd and /tmp/password are the same.
@@ -61,9 +66,17 @@ can be used to implement testing, I would imagine.
 - [ ] can ls /etc/passwd and get reasonable results (especially given endianess, big endian fails)
 - [ ] can ifconfig / arp / netstat / ps / etc and get reasonable results
 - [ ] can execute commands ..
-- [ ] can use networkpug 
+- [ ] can load networkpug
 - [ ] other features .. upgrade a shell to meterpreter session? for example!
+- [ ] Process exits when metasploit framework exits.
 - [ ] .. others .. ?
 
+## networkpug Checklist
 
+- [ ] metasploit creates tun/tap dev
+- [ ] traffic from remote system shows up in local tun/tap dev
+- [ ] you can ifconfig the tun/tap npug device and ping remote computers
+- [ ] traffic from local system to remote system gets sent on the remote device
+- [ ] can stop networkpug, meterpreter still runs
+- [ ] xxx, others?
 

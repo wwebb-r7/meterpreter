@@ -19,29 +19,45 @@ extern struct detours detours[HOOKED_FUNC_COUNT];
 #ifdef __mips__
 // MIPS big endian
 #define PLATFORM_PC_REG(x) (x->pc)
+
 #define PLATFORM_TRAP(ptr) \
 	do { \
 		(*ptr) = 0x0000000d; \
 	} while(0)
 
-#define PLATFORM_TRAP_SIGNAL (SIGTRAP)
 
-#endif
+#endif // __mips__
 
 #ifdef  __arm__
 // ARM .. need to check endian
 #define PLATFORM_PC_REG(x) (x->arm_pc)
+
 #define PLATFORM_TRAP(ptr) \
 	do { \
 		/* instruct 0xe7f001f0 causes a SIGTRAP */ \
 		(*ptr) = 0xe7f001f0; \
 	} while(0)
 
-#define PLATFORM_TRAP_SIGNAL (SIGTRAP)
+#endif // __arm__
 
+#ifdef __powerpc__
+
+#define PLATFORM_PC_REG(x) (x->gregs[32])
+
+#define PLATFORM_TRAP(ptr) \
+	do { \
+		(*ptr) = 0x7fe00008; \
+	} while(0)
+
+#endif // __powerpc__
+
+#ifndef PLATFORM_OFFSET
+#define PLATFORM_OFFSET(x) (x)
 #endif
 
-#define PLATFORM_OFFSET(x) (x)
+#ifndef PLATFORM_TRAP_SIGNAL
+#define PLATFORM_TRAP_SIGNAL (SIGTRAP)
+#endif
 
 void *platform_arg(mcontext_t *mctx, int param);
 int platform_set_return_value(mcontext_t *mctx, void *value);

@@ -9,5 +9,5 @@ general:
   and anonymous functions to make it less if then / else if / etc 
   spagetti. 
 
-
+  YYY XXX reset pthread_self / %gs / etc XXX YYY
 

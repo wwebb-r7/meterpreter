@@ -282,6 +282,15 @@ void trap_handler(int sig, siginfo_t *info, void *_ctx)
 	printf("ip: %08x, sp: %08x, lr: %08x, pc: %08x\n", mctx->arm_ip, mctx->arm_sp, mctx->arm_lr, mctx->arm_pc);
 	printf("cpsr: %08x, fault: %08x\n", mctx->arm_cpsr, mctx->fault_address);
 #endif
+#ifdef __powerpc__
+	// typedef unsigned long greg_t, gregset_t[48];
+	for(i = 0; i < (sizeof(mctx->gregs) / sizeof(unsigned long)); i+=4) {
+		printf("%02d: 0x%08x, %02d: 0x%08x, %02d: 0x%08x, %02x: 0x%08x\n", 
+			i, mctx->gregs[i], i+1, mctx->gregs[i+1], 
+			i+2, mctx->gregs[i+2], i+3, mctx->gregs[i+3]
+		);	
+	}
+#endif
 #endif
 
 	for(i = 0; i < HOOKED_FUNC_COUNT; i++) {

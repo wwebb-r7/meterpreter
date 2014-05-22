@@ -18,5 +18,14 @@
   | | | | | | | | | | | | | | | | 
   | | | | | | | | | | | | | | | | Stage 3 deals with getting meterpreter itself 
   ',. , . , . , . , . , . , . ,.` up and running. To do this, it loads the 
-libraries such as pcap, ssl, etc. 
+libraries such as pcap, ssl, libsupport, libmetsrv_main. If required, it enables
+debugging in the libsupport and libmetsrv_main libraries. 
+
+The POSIX meterpreter utilizes the musl libc environment because it combines the
+ld, libdl, and libc environments in a single .so, instead of having various .so's
+for different features (which in turn reduces the complexity for us).
+
+
+
+
 
