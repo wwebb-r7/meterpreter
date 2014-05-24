@@ -110,8 +110,17 @@ void networkpug_thread(THREAD *thread)
 
 		count = pcap_dispatch(np->pcap, 1000, packet_handler, (u_char *)np);
 
-		if(count > 0) {
+		switch(count) {
+		case -1:
+			dprintf("an error occured in pcap_dispatch ..");
+			// should we warn server.
+			break;
+		case -2:
+			dprintf("packet_handler called pcap_breakloop, breaking early");
+			break;
+		default:
 			dprintf("pcap_dispatch returned %d", count);
+			break;
 		}
 
 		if(np->packet_stream) {
@@ -181,6 +190,13 @@ void free_networkpug(NetworkPug *np, int close_channel, int destroy_channel)
 	}
 
 	// np->active is now false.
+	//
+	// we're the only thread executing this piece of code.
+
+	if(np->pkts_seen || np->pkts_injected) {
+		dprintf("[%s] sent %d packets to metasploit, and injected %d packets",
+			np->pkts_seen, np->pkts_injected);
+	}
 
 	if(np->thread) {
 		// Thread termination will take up to 1 second
