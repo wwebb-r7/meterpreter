@@ -87,7 +87,7 @@ int netlink_request(int fd, int family, int type)
 	//nh->nlmsg_pid = NETLINKID();
 	// some systems require pid to 0
 	nh->nlmsg_pid = 0;
-	nh->nlmsg_seq = __atomic_inc(&seqno);
+	nh->nlmsg_seq = __sync_fetch_and_add(&seqno, 1);
 
 	ng->rtgen_family = family;
 	

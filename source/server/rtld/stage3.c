@@ -387,7 +387,7 @@ void *load_dependencies()
 
 	// libmetsrv_main must be last on the list.
 	char *dependencies[] = {
-		"libpcap.so", "libcrypto.so.1.0.0",
+		"libpcap.so.1", "libcrypto.so.1.0.0",
 		"libssl.so.1.0.0", "libsupport.so",
 		"libmetsrv_main.so", NULL
 	};
@@ -497,27 +497,6 @@ void *dlopenbuf(char *name, void *data, size_t len)
 	in_dlopen = 0;
 
 	return r;
-}
-
-int __atomic_inc(volatile int *x)
-{
-	int ret;
-	static pthread_mutex_t mux = PTHREAD_MUTEX_INITIALIZER;
-
-	/*
-	 * Yes, this is incredibly lame, and yes, I'm ashamed.
-	 * But in my defense, musl-libc doesn't seem to export
-	 * atomic symbols, unlike bionic :(
-	 */
-
-	printf("atomic inc called\n");
-	pthread_mutex_lock(&mux);
-	ret = *x;
-	*x = *x + 1;
-	pthread_mutex_unlock(&mux);
-	printf("atomic inc finished\n");
-
-	return ret;
 }
 
 // end bionic support.

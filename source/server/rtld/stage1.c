@@ -125,7 +125,7 @@ int main(int argc, char **argv)
 	setup_stack(&stack_blob, &loaded_libc_blob, &loaded_stage3_blob); 
 	setup_detours(&loaded_libc_blob, &loaded_stage3_blob);
 
-	add_library(&loaded_stage3_blob, "/nx/libpcap.so", &loaded_libpcap_blob);
+	add_library(&loaded_stage3_blob, "/nx/libpcap.so.1", &loaded_libpcap_blob);
 	add_library(&loaded_stage3_blob, "/nx/libcrypto.so.1.0.0", &loaded_libcrypto_blob);
 	add_library(&loaded_stage3_blob, "/nx/libssl.so.1.0.0", &loaded_libssl_blob);
 	add_library(&loaded_stage3_blob, "/nx/libsupport.so", &loaded_libsupport_blob);

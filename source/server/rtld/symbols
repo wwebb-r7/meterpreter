@@ -3,5 +3,4 @@
 	__futex_wake;
 	gettid;
 	dlopenbuf;
-	__atomic_inc;
 };
