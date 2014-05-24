@@ -1,35 +1,31 @@
-VPATH=../../source/extensions/posix_sample
+VPATH=../../source/extensions/sniffer
 
 OPENSSL=../../source/openssl/include
 COMMON=../../source/common
 SERVER=../../source/server
 
-CFLAGS=-fno-stack-protector -nostdinc -nostdlib -fPIC -DPIC -g -Wall
-CFLAGS+=-D_UNIX -D__linux__
-CFLAGS+=-I${COMMON} -I${SERVER} -I${OPENSSL}
-CFLAGS+= -I ../../source/bionic/libc/include -I ../../source/bionic/libc/kernel/common/linux/ -I ../../source/bionic/libc/kernel/common/ -I ../../source/bionic/libc/arch-x86/include/
-CFLAGS+= -I ../../source/bionic/libc/kernel/arch-x86/
-CFLAGS+= -Dwchar_t="char" -fno-builtin -D_SIZE_T_DECLARED -DElf_Size="u_int32_t"
-CFLAGS+= -D_BYTE_ORDER=_LITTLE_ENDIAN
-CFLAGS+= -lgcc -L../../source/bionic/compiled
-CFLAGS+= -fPIC -Os 
-CFLAGS+= -I../../source/extensions/stdapi/server -lc -lsupport
+CFLAGS=-fPIC -DPIC -g -Wall
+CFLAGS+=-D_UNIX
+CFLAGS+=-I${COMMON} -I${SERVER} -I${OPENSSL} -I${VPATH}
 
-CFLAGS+= -march=i386 -m32
+LDFLAGS=-L$(COMPILED)
 
-objects = test.o
+objects = sniffer.o
 
 all: posix_sample.so
 
-debug: CFLAGS+=-ggdb
+debug: CFLAGS+= -ggdb
 debug: all
 
-posix_sample.so: test.o
-	gcc -shared $(CFLAGS) -o $@ $(objects)
+.c.o:
+	$(CROSS)gcc $(CFLAGS) -c $<
+
+posix_sample.so: $(objects)
+	$(CROSS)gcc -shared $(CFLAGS) $(objects) -o $@ $(LDFLAGS) -lpcap -lcrypto -lssl -lmetsrv_main -lsupport
 
 # And, once done:
 # copy posix_sample.so to data/meterpreter/ext_server_posix_sample.lso and "use posix_sample"
 
-.PHONY: clean
+.PHONY: clean debug
 clean:
-	rm -f *.o *.so *~
+	rm -f *.o *.so *~; rm -f $(objects)
