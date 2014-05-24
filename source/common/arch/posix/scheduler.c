@@ -49,7 +49,7 @@ DWORD scheduler_initialize( Remote * remote )
 
 /*
  * Destroy the scheduler subsystem. All waitable threads at signaled to terminate.
- * this function blocks untill all waitable threads have terminated.
+ * this function blocks until all waitable threads have terminated.
  */
 DWORD scheduler_destroy( VOID )
 {
@@ -60,24 +60,32 @@ DWORD scheduler_destroy( VOID )
 	THREAD * thread = NULL;
 	WaitableEntry * entry = NULL;
 
-	dprintf( "[SCHEDULER] entering scheduler_destroy." );
+	dprintf( "[SCHEDULER] entering scheduler_destroy .. lock is %p", schedulerThreadList->lock);
 
 	lock_acquire( schedulerThreadList->lock );
 
 	count = list_count( schedulerThreadList );
+
+	dprintf("[SCHEDULER] lock acquired, found %d threads", count);
 
 	for( index=0 ; index < count ; index++ )
 	{
 		thread = (THREAD *)list_get( schedulerThreadList, index );
 		if( thread == NULL )
 			continue;
+
+		dprintf("[SCHEDULER] processing index %d", index);
 		
 		list_push( jlist, thread );
 
 		entry = (WaitableEntry *)thread->parameter1;
 
+		dprintf("[SCHEDULER] WaitableEntry parameter1 is %p", entry);
+
 		if( !entry->running )
 			event_signal( entry->resume );
+
+		dprintf("[SCHEDULER] terminating thread %p", thread);
 
 		thread_sigterm( thread );
 	}
@@ -94,7 +102,7 @@ DWORD scheduler_destroy( VOID )
 		if( thread == NULL )
 			break;
 
-		dprintf( "[SCHEDULER] scheduler_destroy, joining thread 0x%08X...", thread );
+		dprintf( "[SCHEDULER] scheduler_destroy, joining thread %p...", thread );
 
 		thread_join( thread );
 	}

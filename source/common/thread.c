@@ -31,7 +31,39 @@ LOCK * lock_create( VOID )
 #ifdef _WIN32
 		lock->handle = CreateMutex( NULL, FALSE, NULL );
 #else
-		pthread_mutex_init(&lock->handle, NULL);
+
+/*
+ * http://msdn.microsoft.com/en-us/library/windows/desktop/ms682411%28v=vs.85%29.aspx
+ *
+ * The thread that owns a mutex can specify the same mutex in repeated wait
+ * function calls without blocking its execution. Typically, you would not wait
+ * repeatedly for the same mutex, but this mechanism prevents a thread from
+ * deadlocking itself while waiting for a mutex that it already owns. However,
+ * to release its ownership, the thread must call ReleaseMutex once for each
+ * time that the mutex satisfied a wait.
+ *
+ * ^-- So, we have a recursive mutex to be the rough equivilient.
+ *
+ */
+
+		dprintf("creating lock %p", lock);
+
+		do {
+			int ret;
+			pthread_mutexattr_t attr;
+
+			pthread_mutexattr_init(&attr);
+			// pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
+			pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+
+			if((ret = pthread_mutex_init(&lock->handle, &attr))) {
+				dprintf("Unable to pthread_mutex_init lock %p - ret is %d / %s", lock, ret, strerror(ret));
+			}
+
+			pthread_mutex_destroy(&attr);
+
+		} while(0);
+
 #endif
 	}
 	return lock;
@@ -49,7 +81,14 @@ VOID lock_destroy( LOCK * lock )
 #ifdef _WIN32
 		CloseHandle( lock->handle );
 #else
-		pthread_mutex_destroy(&lock->handle);
+		dprintf("destroying lock %p", lock);
+
+		do {
+			int ret;
+			if((ret = pthread_mutex_destroy(&lock->handle))) {
+				dprintf("Unable to destroy mutex %p - ret is %d / %s", lock, ret, strerror(ret));
+			}
+		} while(0);
 #endif
 
 		free( lock );
@@ -65,7 +104,13 @@ VOID lock_acquire( LOCK * lock )
 #ifdef _WIN32
 		WaitForSingleObject( lock->handle, INFINITE );
 #else
-		pthread_mutex_lock(&lock->handle);
+		int ret;
+
+		// dprintf("lock_acquire(%p)", lock);
+
+		if((ret = pthread_mutex_lock(&lock->handle))) {
+			dprintf("Unable to lock_acquire for lock %p - ret is %d / %s", lock, ret, strerror(ret));
+		}
 #endif
 	}
 }
@@ -79,7 +124,13 @@ VOID lock_release( LOCK * lock )
 #ifdef _WIN32
 		ReleaseMutex( lock->handle );
 #else
-		pthread_mutex_unlock(&lock->handle);
+		int ret;
+
+		// dprintf("lock_release(%p)", lock);
+
+		if((ret = pthread_mutex_unlock(&lock->handle))) {
+			dprintf("Unable to lock_release for lock %p - ret is %d / %s", lock, ret, strerror(ret));
+		}
 #endif
 	}
 }
@@ -509,6 +560,8 @@ BOOL thread_join( THREAD * thread )
 
 	return FALSE;
 #else
+	dprintf("thread_join called on %p", thread);
+
 	if(pthread_join(thread->pid, NULL) == 0) 
 		return TRUE;
 
@@ -530,7 +583,9 @@ BOOL thread_destroy( THREAD * thread )
 #ifdef _WIN32
 	CloseHandle( thread->handle );
 #else
-	pthread_detach(thread->pid);
+	// if a thread has been join'd, it's already terminated. So it appears the below
+	// results in undefined behaviour (or in our case, a crash!)
+	// pthread_detach(thread->pid);
 #endif
 
 	free( thread );
