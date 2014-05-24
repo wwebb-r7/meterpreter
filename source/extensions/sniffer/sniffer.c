@@ -184,7 +184,12 @@ DWORD PktGetId(DWORD handle, DWORD *thi)
 
 DWORD PktGetTimeStamp(DWORD handle, DWORD *thi)
 {
+#ifdef _WIN32
 	__int64_t i64;
+#else
+	int64_t i64;
+#endif
+
 	PeterPacket *pp = (PeterPacket *)(handle);
 
 	i64 = (pp->h.ts.tv_sec + 11644473600) * 10000000;
