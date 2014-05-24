@@ -1,10 +1,7 @@
 #include "../../common/common.h"
 
 #include <pcap/pcap.h>
-
 #include "networkpug.h"
-
-#include <sys/atomics.h>
 
 typedef struct networkpug {
 	char *interface;
@@ -21,7 +18,7 @@ typedef struct networkpug {
 	THREAD *thread;		
 
 	// XXX, do something with this. Stats on close?
-	volatile int pkts_seen, pkts_injected;
+	volatile long pkts_seen, pkts_injected;
 
 	Channel *channel;
 	Remote *remote;	
@@ -29,8 +26,6 @@ typedef struct networkpug {
 	unsigned char *packet_stream;
 	size_t packet_stream_length;
 
-	// PKS, potential race with socket writing / shutdowns
-	// maybe ref count / spinlock via atomic instructions. need to think more :-)
 
 } NetworkPug;
 
@@ -84,7 +79,7 @@ void packet_handler(u_char *user, const struct pcap_pkthdr *h, const u_char *byt
 
 	np->packet_stream_length += plussize;
 
-	__atomic_inc(&(np->pkts_seen));
+	__sync_fetch_and_add(&(np->pkts_seen), 1);
 }
 
 
@@ -132,7 +127,7 @@ void networkpug_thread(THREAD *thread)
 }
 
 /*
- * Find an unused pug
+ * Find an unused pug. Must be called with pug_lock locked.
  */
 
 NetworkPug *allocate_networkpug(char *interface)
@@ -171,12 +166,15 @@ void free_networkpug(NetworkPug *np, int close_channel, int destroy_channel)
 	 * If another thread is in write/pcap inject, etc.
 	 * 
 	 * Hopefully setting np->active = 0 early on and handling recieve thread
-	 * first will prevent any possible issues. No guarantees, however
+	 * first will prevent any possible issues. No guarantees, however.
+	 * 
+	 * Reference counting, perhaps, might work best. Increment for 
+	 * networkpug_thread, and increment for channel. On channel destruction
+	 * a callback would indicate it's free, same when destroying the
+	 * networkpug_thread.
 	 */
 
-
-	cont = __atomic_swap(0, &np->active);
-	
+	cont = __sync_bool_compare_and_swap(&np->active, 1, 0);
 	if(! cont) {
 		dprintf("Seems the pug at %p was already set free", &np);
 		return;
@@ -252,8 +250,8 @@ DWORD networkpug_channel_write(Channel *channel, Packet *request,
 	pcap_inject(np->pcap, buffer, bufferSize);
 	*bytesWritten = bufferSize; // XXX, can't do anything if it fails really
 
-	__atomic_inc(&(np->pkts_injected));
-	
+	__sync_fetch_and_add(&(np->pkts_injected), 1);
+
 	return ERROR_SUCCESS;
 }
 
@@ -290,6 +288,7 @@ DWORD request_networkpug_start(Remote *remote, Packet *packet)
 	char *interface;
 	char *extra_filter;
 	char errbuf[PCAP_ERRBUF_SIZE+4];
+	char *final_filter = NULL;
 
 	struct bpf_program bpf;
 	int bpf_fail = 0;
@@ -313,71 +312,88 @@ DWORD request_networkpug_start(Remote *remote, Packet *packet)
 		
 		}
 
+		// Are we monitoring another interface?
 		np = find_networkpug(interface);
 		if(np) {
 			dprintf("Duplicate pug found for %s!", interface);
 			break;
 		}
 
+		// Can we find a free slot for monitoring?
 		np = allocate_networkpug(interface);
+		if(! np) {
+			dprintf("No free pugs available for %s :~(", interface);
+			break;
+		}
 
+		// Let's open the interface
 		np->remote = remote;
 		np->pcap = pcap_open_live(interface, MAX_MTU, 1, 1000, errbuf);
-		// xxx, add in filter support
-		np->thread = thread_create((THREADFUNK) networkpug_thread, np, remote, NULL);
-		
+		if(! np->pcap) {
+			dprintf("Unable to pcap_open_live on %s - errbuf is %s", interface, errbuf);
+			break;
+		}
+
+		// Construct the socket filter
+		if(extra_filter) {
+			asprintf(&final_filter, "%s and (%s)", packet_filter, extra_filter);
+		} else {
+			final_filter = strdup(packet_filter);
+		}
+		dprintf("final filter is '%s'", final_filter);
+
+		// Compile the filter
+		bpf_fail = pcap_compile(np->pcap, &bpf, final_filter, 1, 0);
+		free(final_filter);
+
+		if(bpf_fail == -1) {
+			dprintf("Failed to pcap compile filter, pcap_geterr says '%s'", pcap_geterr(np->pcap));
+			break;
+		}
+
+		// Set the filter
+		bpf_fail = pcap_setfilter(np->pcap, &bpf);
+		if(bpf_fail == -1) {
+			dprintf("Failed to pcap_setfilter(), pcap_geterr says '%s'", pcap_geterr(np->pcap));
+			break;
+		}
+
+		pcap_freecode(&bpf);
+
+		// Let's get started on the rest of the code.
+
+		np->thread = thread_create((THREADFUNK) networkpug_thread, np, remote, NULL);	
+		if(!np->thread) {
+			dprintf("Failed to thread_create networkpug_thread!");
+			break;
+		}
+
 		chops.native.context = np;
 		chops.native.write = networkpug_channel_write;
 		chops.native.close = networkpug_channel_close;
 		// interact, read don't need to be implemented.
 
 		np->channel = channel_create_pool(0, CHANNEL_FLAG_SYNCHRONOUS, &chops);
-
-		if(np->pcap) {
-			char *final_filter = NULL;
-
-			if(extra_filter) {
-				asprintf(&final_filter, "%s and (%s)", packet_filter, extra_filter);
-			} else {
-				final_filter = strdup(packet_filter);
-			}
-
-			dprintf("final filter is '%s'", final_filter);
-
-			bpf_fail = pcap_compile(np->pcap, &bpf, final_filter, 1, 0);
-
-			free(final_filter);
-
-			if(! bpf_fail)
-				bpf_fail = pcap_setfilter(np->pcap, &bpf);
-		}
-
-		if(! np->pcap || ! np->thread || ! np->channel || bpf_fail) {
-			dprintf("setting up network pug failed. pcap: %p, thread: %p, channel: %p, bpf_fail: %d",
-				 np->pcap, np->thread, np->channel, bpf_fail);
-
-			if(! np->pcap) {
-				dprintf("np->pcap is NULL, so errbuf is '%s'", errbuf);
-			}
-
-			if(bpf_fail) {
-				dprintf("setting filter failed. pcap_geterr() == '%s'", pcap_geterr(np->pcap));
-			}
-
+		if(! np->channel) {
+			dprintf("Failed to channel_create_pool");
 			break;
 		}
-	
+
+		dprintf("setup completed, about to run thread");
+
 		channel_set_type(np->channel, "networkpug");
 		packet_add_tlv_uint(response, TLV_TYPE_CHANNEL_ID, channel_get_id(np->channel));
 		np->active = 1;
-
 		thread_run(np->thread);
+
+		dprintf("thread running!");
 
 		result = ERROR_SUCCESS;
 
 	} while(0);
 
 	if(result != ERROR_SUCCESS) {
+		// We mark this as active so that it can be free()'d appropriately
 		np->active = 1;
 		free_networkpug(np, FALSE, TRUE);
 	}
