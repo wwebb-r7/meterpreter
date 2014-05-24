@@ -117,14 +117,21 @@ void networkpug_thread(THREAD *thread)
 			break;
 		case -2:
 			dprintf("packet_handler called pcap_breakloop, breaking early");
-			break;
+			continue;
 		default:
 			dprintf("pcap_dispatch returned %d", count);
 			break;
 		}
 
 		if(np->packet_stream) {
-			channel_write(np->channel, np->remote, NULL, 0, (PUCHAR) np->packet_stream, np->packet_stream_length, NULL);
+			if(np->active) {
+				channel_write(np->channel, np->remote, NULL, 0, 
+					(PUCHAR) np->packet_stream, 
+					np->packet_stream_length, NULL
+				);
+			} else {
+				dprintf("Skipping sending some data to server because networkpug is no longer active");
+			}
 
 			free(np->packet_stream);
 			np->packet_stream = NULL;
@@ -195,7 +202,8 @@ void free_networkpug(NetworkPug *np, int close_channel, int destroy_channel)
 
 	if(np->pkts_seen || np->pkts_injected) {
 		dprintf("[%s] sent %d packets to metasploit, and injected %d packets",
-			np->pkts_seen, np->pkts_injected);
+			np->interface, np->pkts_seen, np->pkts_injected
+		);
 	}
 
 	if(np->thread) {
