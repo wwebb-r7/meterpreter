@@ -1,6 +1,8 @@
 #ifndef ELFLOADER_H
 #define ELFLOADER_H
 
+#include <stdint.h>
+#include <limits.h>
 #include <sys/types.h>
 #include "blob.h"
 #include <elf.h>

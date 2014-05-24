@@ -221,6 +221,9 @@ int setup_detours(blob_t *libc, blob_t *stage3)
 	return 0;
 }
 
+// The below should be moved to the platform file at some
+// stage.
+
 void and_jump(blob_t *stack_blob, blob_t *libc_blob)
 {
 	// Where does Napolean keep his armies? In his sleevies.
@@ -263,8 +266,16 @@ void and_jump(blob_t *stack_blob, blob_t *libc_blob)
 
 	// calling will mess up our stack ..
 	asm("jmpq *%rax;");
-#endif
+#elif __i386__
+	register long (*entry)() asm ("eax");
+	register long *(*sp) asm("esp");
 
+	sp = (long *) stack_blob->blob;
+	entry = (long)(libc_blob->blob + ehdr->e_entry);
+
+	// calling will mess up our stack ..
+	asm("jmp *%eax;");
+#endif
 
 	printf("hmmm. And libc returned back to us :/\n"); fflush(stdout);
 	crash();

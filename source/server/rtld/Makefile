@@ -19,10 +19,13 @@ debug: DEBUG=true
 debug: CFLAGS+=-ggdb
 debug: all
 
+platform.c:
+	ln -s platform-$(PLATFORM_FILE).c platform.c
+
 gzip2raw: gzip2raw.c
 	gcc -Wall -ggdb -O2 gzip2raw.c -o gzip2raw
 
-platform.o: platform.h
+platform.o: platform.c platform.h
 	$(CROSS)gcc $(CFLAGS) -c platform.c
 
 stage3: gzip2raw stage3.c elfloader.o platform.o
@@ -32,8 +35,8 @@ stage3: gzip2raw stage3.c elfloader.o platform.o
 	./gzip2raw stage3.gz stage3.raw
 	# arm, mips -- elf32-littlearm ..
 	# 
-	$(CROSS)objcopy -I binary -O elf64-x86-64 \
-		--binary-architecture=i386 \
+	$(CROSS)objcopy -I binary -O $(BFD_TARGET) \
+		--binary-architecture=$(BINARY_ARCHITECTURE) \
 		--redefine-sym _binary_stage3_raw_start=stage3_start \
 		--redefine-sym _binary_stage3_raw_end=stage3_end \
 		--redefine-sym _binary_stage3_raw_size=stage3_size \
@@ -54,8 +57,8 @@ stage3: gzip2raw stage3.c elfloader.o platform.o
 	([ "$(DEBUG)" != "true" ] && $(CROSS)strip --strip-debug tmp/$(*).tmp) || true
 	gzip -9nfc < tmp/$(*).tmp >tmp/$(*).gz
 	./gzip2raw tmp/$(*).gz tmp/$(*).raw
-	$(CROSS)objcopy -I binary -O elf64-x86-64 \
-		--binary-architecture=i386 \
+	$(CROSS)objcopy -I binary -O $(BFD_TARGET) \
+		--binary-architecture=$(BINARY_ARCHITECTURE) \
 		--redefine-sym _binary_tmp_$*_raw_start=$*_start \
 		--redefine-sym _binary_tmp_$*_raw_end=$*_end \
 		--redefine-sym _binary_tmp_$*_raw_size=$*_size \

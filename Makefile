@@ -12,11 +12,6 @@ cwd=$(shell pwd)
 # Change me if you want to store dependencies somewhere else
 build_dep = posix-meterp-build-dep
 
-BUILDARCH=$(uname -m)-$(file /bin/ls | grep -o '[ML]SB')
-
-PCAP_HOST=mips-linux
-
-
 ROOT=$(basename $(CURDIR:%/=%))
 
 COMPILED=${ROOT}/${build_tmp}/compiled
@@ -27,7 +22,7 @@ objects += $(COMPILED)/libssl.so
 objects += $(COMPILED)/libsupport.so
 objects += $(COMPILED)/libmetsrv_main.so
 
-outputs  = data/meterpreter/msflinker_linux_x86.bin
+outputs  = data/meterpreter/posix_meterpreter_stage1.bin
 outputs += data/meterpreter/ext_server_stdapi.lso
 outputs += data/meterpreter/ext_server_sniffer.lso
 outputs += data/meterpreter/ext_server_networkpug.lso
@@ -40,6 +35,37 @@ debug: DEBUG=true
 # I'm 99% sure this is the wrong way to do this
 debug: MAKE += debug
 debug: all
+
+
+# When you see something about it most likely not being the right
+# way to do things, do you a) research the proper way to do things
+# (which probably involves including files), or b) it works, so it
+# must be the correct way to do things?
+
+x86: CROSS=${ROOT}/${build_tmp}/i486-linux-musl/bin/i486-linux-musl-
+x86: OPENSSL_TARGET=linux-generic32 BFD_TARGET=elf32-i386
+x86: BINARY_ARCHITECTURE=i386 PLATFORM_FILE=i486
+x86: all
+
+mipsbe: CROSS=${ROOT}/${build_tmp}/mips-linux-musl/bin/mips-linux-musl-
+mipsbe: OPENSSL_TARGET=linux-generic32 BFD_TARGET=elf32-mips
+mipsbe: BINARY_ARCHITECTURE=mips PLATFORM_FILE=mipsbe
+mipsbe: all
+
+x64: CROSS=${ROOT}/${build_tmp}/x86_64-linux-musl/bin/x86_64-linux-musl-
+x64: OPENSSL_TARGET=linux-x86_64 BFD_TARGET=elf64-x86-64
+x64: BINARY_ARCHITECTURE=i386 PLATFORM_FILE=x86_64
+x64: all
+
+ppc: CROSS=${ROOT}/${build_tmp}/powerpc-linux-musl/bin/powerpc-linux-musl-
+ppc: OPENSSL_TARGET=linux-generic32 BFD_TARGET=elf32-powerpc
+ppc: BINARY_ARCHITECTURE=powerpc PLATFORM_FILE=ppc
+ppc: all
+
+armle: CROSS=${ROOT}/${build_tmp}/arm-linux-musleabi/bin/arm-linux-musleabi-
+armle: OPENSSL_TARGET=linux-generic32 BFD_TARGET=elf32-littlearm
+armle: BINARY_TARGET=arm PLATFORM_FILE=arm
+armle: all
 
 $(build_dep):
 	[ -d $(build_dep) ] || mkdir $(build_dep)/
@@ -54,6 +80,7 @@ dependencies: $(build_dep)
 	[ -f $(build_dep)/crossx86-arm-linux-musleabi-1.0.0.tar.xz ] || wget -O $(build_dep)/crossx86-arm-linux-musleabi-1.0.0.tar.xz https://googledrive.com/host/0BwnS5DMB0YQ6bDhPZkpOYVFhbk0/musl-1.0.0/crossx86-arm-linux-musleabi-1.0.0.tar.xz
 	[ -f $(build_dep)/crossx86-powerpc-linux-musl-1.0.0.tar.xz ] || wget -O $(build_dep)/crossx86-powerpc-linux-musl-1.0.0.tar.xz https://googledrive.com/host/0BwnS5DMB0YQ6bDhPZkpOYVFhbk0/musl-1.0.0/crossx86-powerpc-linux-musl-1.0.0.tar.xz
 	[ -f $(build_dep)/crossx86-x86_64-linux-musl-1.0.0.tar.xz ] || wget -O $(build_dep)/crossx86-x86_64-linux-musl-1.0.0.tar.xz https://googledrive.com/host/0BwnS5DMB0YQ6bDhPZkpOYVFhbk0/musl-1.0.0/crossx86-x86_64-linux-musl-1.0.0.tar.xz
+	[ -f $(build_dep)/crossx86-i486-linux-musl-1.0.0.tar.xz ] || wget -O $(build_dep)/crossx86-i486-linux-musl-1.0.0.tar.xz https://googledrive.com/host/0BwnS5DMB0YQ6bDhPZkpOYVFhbk0/musl-1.0.0/crossx86-i486-linux-musl-1.0.0.tar.xz
 
 extract_mips_compiler:
 	[ -d $(build_tmp)/mips-linux-musl ] || tar xJvf $(build_dep)/crossx86-mips-linux-musl-1.0.0.tar.xz -C $(build_tmp)
@@ -67,8 +94,26 @@ extract_ppc_compiler:
 extract_x86_64_compiler:
 	[ -d $(build_tmp)/x86_64-linux-musl ] || tar xJvf $(build_dep)/crossx86-x86_64-linux-musl-1.0.0.tar.xz -C $(build_tmp)
 
+extract_i486_compiler:
+	[ -d $(build_tmp)/i486-linux-musl ] || tar xJvf $(build_dep)/crossx86-i486-linux-musl-1.0.0.tar.xz -C $(build_tmp)
 
-$(COMPILED): dependencies extract_mips_compiler extract_arm_compiler extract_ppc_compiler build_tmp
+copy_mips_libc: $(COMPILED)
+	cp $(build_tmp)/mips-linux-musl/mips-linux-musl/libc.so ${COMPILED}/libc.so
+
+copy_arm_libc: $(COMPILED)
+	cp $(build_tmp)/arm-linux-musleabi/arm-linux-musleabi/libc.so ${COMPILED}/libc.so
+
+copy_ppc_libc: $(COMPILED)
+	cp $(build_tmp)/powerpc-linux-musl/powerpc-linux-musl/libc.so ${COMPILED}/libc.so
+
+copy_x86_64_libc: $(COMPILED)
+	cp $(build_tmp)/x86_64-linux-musl/x86_64-linux-musl/lib/libc.so $(COMPILED)/libc.so
+
+copy_i486_compiler: $(COMPILED)
+	cp $(build_tmp)/i486-linux-musl/i486-linux-musl/lib/libc.so $(COMPILED)/libc.so
+
+
+$(COMPILED): dependencies extract_mips_compiler extract_arm_compiler extract_ppc_compiler extract_x86_64_compiler extract_i486_compiler build_tmp
 	[ -d $(COMPILED)/ ] || mkdir $(COMPILED)/
 
 $(COMPILED)/libcrypto.so: $(build_tmp)/openssl-1.0.1g/libssl.so
@@ -94,7 +139,7 @@ $(COMPILED)/libpcap.so: $(build_tmp)/libpcap-1.5.3/libpcap.so.1.5.3
 $(build_tmp)/libpcap-1.5.3/libpcap.so.1.5.3:
 	[ -d $(build_tmp) ] || mkdir $(build_tmp)
 	[ -f $(build_tmp)/libpcap-1.5.3/configure ] || tar -C $(build_tmp) -xzf $(build_dep)/libpcap-1.5.3.tar.gz
-	(cd $(build_tmp)/libpcap-1.5.3 && CC="${CROSS}gcc" AR="${CROSS}ar" RANLIB="${CROSS}ranlib" LD="${CROSS}ld" MAKEDEPPROG="${CROSS}gcc"  ./configure --host=$(PCAP_HOST)  --with-pcap=linux --disable-bluetooth --without-bluetooth --without-usb --disable-usb --without-can --disable-can --without-usb-linux --disable-usb-linux --without-libnl)
+	(cd $(build_tmp)/libpcap-1.5.3 && CC="${CROSS}gcc" AR="${CROSS}ar" RANLIB="${CROSS}ranlib" LD="${CROSS}ld" MAKEDEPPROG="${CROSS}gcc"  ./configure --with-pcap=linux --disable-bluetooth --without-bluetooth --without-usb --disable-usb --without-can --disable-can --without-usb-linux --disable-usb-linux --without-libnl)
 	echo '#undef HAVE_DECL_ETHER_HOSTTON' >> $(build_tmp)/libpcap-1.5.3/config.h
 	echo '#undef HAVE_SYS_BITYPES_H' >> $(build_tmp)/libpcap-1.5.3/config.h
 	echo '#undef PCAP_SUPPORT_CAN' >> $(build_tmp)/libpcap-1.5.3/config.h
@@ -106,10 +151,10 @@ $(build_tmp)/libpcap-1.5.3/libpcap.so.1.5.3:
 	$(MAKE) -C $(build_tmp)/libpcap-1.5.3
 
 
-data/meterpreter/msflinker_linux_x86.bin: source/server/rtld/msflinker.bin
-	cp source/server/rtld/msflinker.bin data/meterpreter/msflinker_linux_x86.bin
+data/meterpreter/posix_meterpreter_stage1.bin: source/server/rtld/posix_meterpreter_stage1.bin
+	cp source/server/rtld/posix_meterpeter_stage1.bin data/meterpreter/posix_meterpreter_stage1_ARCH.bin
 
-source/server/rtld/msflinker.bin:
+source/server/rtld/posix_meterpreter_stage1.bin:
 	$(MAKE) -C source/server/rtld
 
 $(workspace)/metsrv/libmetsrv_main.so: $(COMPILED)/libsupport.so
@@ -119,7 +164,7 @@ $(COMPILED)/libmetsrv_main.so: $(workspace)/metsrv/libmetsrv_main.so
 	cp $(workspace)/metsrv/libmetsrv_main.so $(COMPILED)/libmetsrv_main.so
 
 $(workspace)/common/libsupport.so:
-	$(MAKE) -C $(workspace)/common CC="${CROSS}gcc" AR="${CROSS}ar" RANLIB="${CROSS}ranlib" LD="${CROSS}ld" MAKEDEPPROG="${CROSS}gcc"
+	$(MAKE) -C $(workspace)/common # CROSS=${CROSS}
 
 $(COMPILED)/libsupport.so: $(workspace)/common/libsupport.so
 	cp $(workspace)/common/libsupport.so $(COMPILED)/libsupport.so
@@ -150,12 +195,9 @@ clean:
 	rm -f $(objects)
 	make -C source/server/rtld/ clean
 	make -C $(workspace) clean
+	rm -rf $(build_tmp)/compiled
 
 depclean:
-	rm -f source/bionic/lib*/*.o
-	find source/bionic/ -name '*.a' -print0 | xargs -0 rm -f 2>/dev/null
-	find source/bionic/ -name '*.so' -print0 | xargs -0 rm -f 2>/dev/null
-	rm -f source/bionic/lib*/*.so
 	rm -rf source/openssl/lib/linux/i386/
 	rm -rf $(build_tmp)
 
