@@ -92,26 +92,103 @@ From your git console, please run:
 Building - POSIX
 ================
 You will need:
- - A compiler toolchain (build-essential package on Ubuntu)
- - gcc-multilib, if you're building on a 64-bit machine
- - jam
  - wget
- - flex
 
-Meterpreter requires libpcap-1.1.1 and OpenSSL 0.9.8o sources, which it
-will download automatically during the build process. If for some
-reason, you cannot access the internet during build, you will need to:
- - wget -O posix-meterp-build-tmp/openssl-0.9.8o.tar.gz https://www.openssl.org/source/openssl-0.9.8o.tar.gz
- - wget -O posix-meterp-build-tmp/libpcap-1.1.1.tar.gz http://www.tcpdump.org/release/libpcap-1.1.1.tar.gz
+In order to compile for a variety of architectures and byte endians, POSIX
+meterpreter utilizes cross-compilers to handle the task of compiling on x86 to
+the target architecture.
 
-(Note that 'make clean' will *delete* these files.)
+Behind the scenes, POSIX meterpreter uses the [musl libc][musllibc] to provide
+the linker and libc.
 
-Now you should be able to type `make` in the base directory, go make a
-sandwich, and come back to a working[1] meterpreter for Linux.
+Currently, the following architectures are implemented.:
+ - x86
+ - x64 (x86\_64)
+ - mipsbe (MIPS big endian)
+ - armle (ARM, little endian)
+ - ppc (PowerPC)
+
+Currently, x64 crashes when printing the initializing debug string - this is
+under investigation as to why.
+
+Dependencies
+------------
+
+If, for some reason, you cannot access the internet during the build process,
+you will need to download the following files:
+
+ - copy from Makefile
+
+Compiling
+---------
+
+Compiling is relatively straight forward - make target, where target is
+currently either x86, x64, mipsbe, armle, or ppc.
+
+.. Make sure you make clean between each build ..
+
+It takes a while ..
 
 [1] For some value of "working."  Meterpreter in POSIX environments is
 not considered stable.  It does stuff, but expect occasional problems.
 
+Adding additional architectures
+-------------------------------
+
+Supporting additional architectures is relatively straight forward,
+there are several things you need:
+
+ - A cross compiler
+ - An instruction that generates a suitable signal (such as SIGTRAP)
+ - Knowing how registers are mapped to `mcontext_t` structure (for more
+   information, see the cross compiler directory for include/bits/signal.h).
+ - How to emulate an instruction (or two) for that architecture.
+
+To find an instruction, often compiling a simple program with
+`__builtin_trap()` and disassembling it will show you what instruction you
+need to generate a SIGTRAP.
+
+Assuming those dependencies are met, it's relatively straight forward to
+implement - copy a similiar architecture .c file in source/server/rtld to
+platform-yours.c, and edit. Additionally, you'll need to modify platform.h for
+some #define macro's, and additionally, stage1.c will need some modification to
+change stack pointers and execution flow.
+
+Debugging
+---------
+
+XXX - enable debugging, /tmp/meterpreter.log.pid
+
+Debugging stage1 binaries can be frustrating due to the lack of library mapping
+information, and symbols. If the problem is easily reproducable and not in an
+extension, you can use the stage3 binary, and libraries from the compiled
+directory, by running
+
+gdb ./stage3
+set environment LD_LIBRARY_PATH=/path/to/compiled/directory
+run
+
+(though you may need to copy the /path/to/compiled/directory/libc.so to
+/lib/ld-musl-arch.so)
+
+Debugging extensions via stage3 would require modifications to the stage3.c to
+write the requested library to disk and dlopen() that file in dlopenbuf(),
+which isn't implemented yet.
+
+Debugging from stage1 can be broken into two parts - first part is before first
+dlopen() is called in stage3.c, and afterwards. Before dlopen(), you can often
+use gdb's "record full" instruction to help perform analysis in what went
+wrong. Once you hit the problem, you can use the "reverse" instructions to step
+backwards through the code execution to determine how you got into the state
+you are in when the problem occurs. (Assuming you're on a platform where
+reverse debugging is possible).
+
+"record full" doesn't work to well post dlopen() due to the SIGTRAP's breaking
+the debugging flow.
+
+Another way to do debugging is to note the crash location, and take the last
+three nibbles, and the instruction and objdump -d the various libraries to find
+where abouts it crashed, to get a backtrace that way.
 
 Testing
 =======
@@ -203,3 +280,4 @@ Good luck!
   [build_icon]: https://ci.metasploit.com/buildStatus/icon?job=MeterpreterWin
   [rdi]: https://github.com/rapid7/ReflectiveDLLInjection
   [openssl]: https://github.com/rapid7/meterpreter/tree/master/source/openssl
+  [musllibc]: http://musl-libc.org/
