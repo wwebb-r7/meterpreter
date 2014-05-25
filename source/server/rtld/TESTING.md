@@ -80,3 +80,23 @@ can be used to implement testing, I would imagine.
 - [ ] can stop networkpug, meterpreter still runs
 - [ ] xxx, others?
 
+## sniffer Checklist
+
+- [ ] sniffer_interfaces
+- [ ] sniffer_start
+ - [ ] sniffer_start <interface> 
+ - [ ] sniffer_start <interface> packet capture size
+ - [ ] sniffer_start <interface> packet capture size "bpf filter"
+ - [ ] discard packets
+ - [ ] sniffer_dump
+- [ ] sniffer_stop
+
+# Future testing ideas
+
+- AddressSanitizer support
+- ThreadSanitizer support (might require too much annotation ...)
+- -Wall, -Wextra no outputs
+- Compiles cleanly with clang as well
+- Others?
+
+

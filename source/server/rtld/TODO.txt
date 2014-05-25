@@ -1,9 +1,15 @@
 mipsbe:
-  - stat results are completely wrong. endian issue.
+  - stat() results are completely wrong. endian issue.
 
 general:
   execute / shell is broken. seems to break when requesting a channel / 
   interactive. If execute -f /bin/sleep -a 60 -> it works fine.
+
+  that code should probably be rewritten from scratch using a structure
+  and anonymous functions to make it less if then / else if / etc 
+  spagetti.  
+
+  -- 
 
   Phdr p_align being 2**21 on x86_64 and 2**16 on mipsbe leads to a lot of
   wasted memory... perhaps there is a better way to allocate than single big
@@ -11,9 +17,17 @@ general:
   (or whatever is applicable) to reduce the amount of holes in the
   allocations.
 
-  that code should probably be rewritten from scratch using a structure
-  and anonymous functions to make it less if then / else if / etc 
-  spagetti. 
+  -- 
 
-  YYY XXX reset pthread_self / %gs / etc XXX YYY
+  ThreadSanitizer / MemorySanitizer / etc support would be good.
+
+  Perhaps moving to http://ellcc.org might be worthwhile?
+
+  --
+
+  Verify the main thread code is reset during starting the newly
+  loaded musl libc entry point code, otherwise work out how to fix
+  that in stage3.
+
+  
 
