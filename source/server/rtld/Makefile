@@ -33,8 +33,6 @@ stage3: gzip2raw stage3.c elfloader.o platform.o
 	([ "$(DEBUG)" != "true" ] && $(CROSS)strip --strip-debug stage3) || true
 	gzip -9nfc < stage3 >stage3.gz
 	./gzip2raw stage3.gz stage3.raw
-	# arm, mips -- elf32-littlearm ..
-	# 
 	$(CROSS)objcopy -I binary -O $(BFD_TARGET) \
 		--binary-architecture=$(BINARY_ARCHITECTURE) \
 		--redefine-sym _binary_stage3_raw_start=stage3_start \
@@ -97,8 +95,8 @@ stage1: $(LIBOBJECTS) $(OBJ) stage1.c stage1.o stage3.o libc_offsets.h stage3 bl
 
 clean:
 	rm -f $(OBJECTS)
-	rm -f lib*.h stage3.h
-	rm -f *.o
+	rm -f lib*.h stage3.h libc_offsets.h gzip2raw gzip2raw.o platform.c
+	rm -f *.o stage1 stage3 
 
 .PHONY: clean
 

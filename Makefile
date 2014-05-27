@@ -22,14 +22,14 @@ objects += $(COMPILED)/libssl.so
 objects += $(COMPILED)/libsupport.so
 objects += $(COMPILED)/libmetsrv_main.so
 
-outputs  = data/meterpreter/posix_meterpreter_stage1.bin
-outputs += data/meterpreter/ext_server_stdapi.lso
-outputs += data/meterpreter/ext_server_sniffer.lso
-outputs += data/meterpreter/ext_server_networkpug.lso
+outputs  = data/meterpreter/posix_meterpreter_stage1_${METARCH}.bin
+outputs += data/meterpreter/ext_server_stdapi.${METARCH}lso
+outputs += data/meterpreter/ext_server_sniffer.${METARCH}lso
+outputs += data/meterpreter/ext_server_networkpug.${METARCH}lso
 
 workspace = workspace
 
-all: $(objects) $(outputs)
+all: $(COMPILED) $(objects) $(outputs)
 
 debug: DEBUG=true
 # I'm 99% sure this is the wrong way to do this
@@ -43,29 +43,49 @@ debug: all
 # must be the correct way to do things?
 
 x86: CROSS=${ROOT}/${build_tmp}/i486-linux-musl/bin/i486-linux-musl-
-x86: OPENSSL_TARGET=linux-generic32 BFD_TARGET=elf32-i386
-x86: BINARY_ARCHITECTURE=i386 PLATFORM_FILE=i486
-x86: all
+x86: OPENSSL_TARGET=linux-generic32
+x86: BFD_TARGET=elf32-i386
+x86: BINARY_ARCHITECTURE=i386
+x86: PLATFORM_FILE=i486
+x86: PCAP_HOST=i386-linux
+x86: METARCH=x86
+x86: copy_i486_libc all
 
 mipsbe: CROSS=${ROOT}/${build_tmp}/mips-linux-musl/bin/mips-linux-musl-
-mipsbe: OPENSSL_TARGET=linux-generic32 BFD_TARGET=elf32-mips
-mipsbe: BINARY_ARCHITECTURE=mips PLATFORM_FILE=mipsbe
-mipsbe: all
+mipsbe: OPENSSL_TARGET=linux-generic32
+mipsbe: BFD_TARGET=elf32-tradbigmips
+mipsbe: BINARY_ARCHITECTURE=mips
+mipsbe: PLATFORM_FILE=mipsbe
+mipsbe: PCAP_HOST=mips-linux
+mipsbe: METARCH=mipsbe
+mipsbe: copy_mips_libc all
 
 x64: CROSS=${ROOT}/${build_tmp}/x86_64-linux-musl/bin/x86_64-linux-musl-
-x64: OPENSSL_TARGET=linux-x86_64 BFD_TARGET=elf64-x86-64
-x64: BINARY_ARCHITECTURE=i386 PLATFORM_FILE=x86_64
-x64: all
+x64: OPENSSL_TARGET=linux-x86_64
+x64: BFD_TARGET=elf64-x86-64
+x64: BINARY_ARCHITECTURE=i386
+x64: PLATFORM_FILE=x86_64
+x64: PCAP_HOST=x86_64-linux
+x64: METARCH=x64
+x64: copy_x86_64_libc all
 
 ppc: CROSS=${ROOT}/${build_tmp}/powerpc-linux-musl/bin/powerpc-linux-musl-
-ppc: OPENSSL_TARGET=linux-generic32 BFD_TARGET=elf32-powerpc
-ppc: BINARY_ARCHITECTURE=powerpc PLATFORM_FILE=ppc
-ppc: all
+ppc: OPENSSL_TARGET=linux-generic32
+ppc: BFD_TARGET=elf32-powerpc
+ppc: PCAP_HOST=powerpc-linux
+ppc: BINARY_ARCHITECTURE=powerpc
+ppc: PLATFORM_FILE=ppc
+ppc: METARCH=ppc
+ppc: copy_ppc_libc all
 
 armle: CROSS=${ROOT}/${build_tmp}/arm-linux-musleabi/bin/arm-linux-musleabi-
-armle: OPENSSL_TARGET=linux-generic32 BFD_TARGET=elf32-littlearm
-armle: BINARY_TARGET=arm PLATFORM_FILE=arm
-armle: all
+armle: OPENSSL_TARGET=linux-generic32
+armle: BFD_TARGET=elf32-littlearm
+armle: PCAP_HOST=arm-linux
+armle: BINARY_TARGET=arm
+armle: PLATFORM_FILE=arm
+armle: METARCH=armle
+armle: copy_arm_libc all
 
 $(build_dep):
 	[ -d $(build_dep) ] || mkdir $(build_dep)/
@@ -98,22 +118,22 @@ extract_i486_compiler:
 	[ -d $(build_tmp)/i486-linux-musl ] || tar xJvf $(build_dep)/crossx86-i486-linux-musl-1.0.0.tar.xz -C $(build_tmp)
 
 copy_mips_libc: $(COMPILED)
-	cp $(build_tmp)/mips-linux-musl/mips-linux-musl/libc.so ${COMPILED}/libc.so
+	cp $(build_tmp)/mips-linux-musl/mips-linux-musl/lib/libc.so ${COMPILED}/libc.so
 
 copy_arm_libc: $(COMPILED)
-	cp $(build_tmp)/arm-linux-musleabi/arm-linux-musleabi/libc.so ${COMPILED}/libc.so
+	cp $(build_tmp)/arm-linux-musleabi/arm-linux-musleabi/lib/libc.so ${COMPILED}/libc.so
 
 copy_ppc_libc: $(COMPILED)
-	cp $(build_tmp)/powerpc-linux-musl/powerpc-linux-musl/libc.so ${COMPILED}/libc.so
+	cp $(build_tmp)/powerpc-linux-musl/powerpc-linux-musl/lib/libc.so ${COMPILED}/libc.so
 
 copy_x86_64_libc: $(COMPILED)
 	cp $(build_tmp)/x86_64-linux-musl/x86_64-linux-musl/lib/libc.so $(COMPILED)/libc.so
 
-copy_i486_compiler: $(COMPILED)
+copy_i486_libc: $(COMPILED)
 	cp $(build_tmp)/i486-linux-musl/i486-linux-musl/lib/libc.so $(COMPILED)/libc.so
 
 
-$(COMPILED): dependencies extract_mips_compiler extract_arm_compiler extract_ppc_compiler extract_x86_64_compiler extract_i486_compiler build_tmp
+$(COMPILED): build_tmp dependencies extract_mips_compiler extract_arm_compiler extract_ppc_compiler extract_x86_64_compiler extract_i486_compiler
 	[ -d $(COMPILED)/ ] || mkdir $(COMPILED)/
 
 $(COMPILED)/libcrypto.so: $(build_tmp)/openssl-1.0.1g/libssl.so
@@ -139,7 +159,7 @@ $(COMPILED)/libpcap.so: $(build_tmp)/libpcap-1.5.3/libpcap.so.1.5.3
 $(build_tmp)/libpcap-1.5.3/libpcap.so.1.5.3:
 	[ -d $(build_tmp) ] || mkdir $(build_tmp)
 	[ -f $(build_tmp)/libpcap-1.5.3/configure ] || tar -C $(build_tmp) -xzf $(build_dep)/libpcap-1.5.3.tar.gz
-	(cd $(build_tmp)/libpcap-1.5.3 && CC="${CROSS}gcc" AR="${CROSS}ar" RANLIB="${CROSS}ranlib" LD="${CROSS}ld" MAKEDEPPROG="${CROSS}gcc"  ./configure --with-pcap=linux --disable-bluetooth --without-bluetooth --without-usb --disable-usb --without-can --disable-can --without-usb-linux --disable-usb-linux --without-libnl)
+	(cd $(build_tmp)/libpcap-1.5.3 && CC="${CROSS}gcc" AR="${CROSS}ar" RANLIB="${CROSS}ranlib" LD="${CROSS}ld" MAKEDEPPROG="${CROSS}gcc"  ./configure --host=${PCAP_HOST} --with-pcap=linux --disable-bluetooth --without-bluetooth --without-usb --disable-usb --without-can --disable-can --without-usb-linux --disable-usb-linux --without-libnl)
 	echo '#undef HAVE_DECL_ETHER_HOSTTON' >> $(build_tmp)/libpcap-1.5.3/config.h
 	echo '#undef HAVE_SYS_BITYPES_H' >> $(build_tmp)/libpcap-1.5.3/config.h
 	echo '#undef PCAP_SUPPORT_CAN' >> $(build_tmp)/libpcap-1.5.3/config.h
@@ -151,54 +171,57 @@ $(build_tmp)/libpcap-1.5.3/libpcap.so.1.5.3:
 	$(MAKE) -C $(build_tmp)/libpcap-1.5.3
 
 
-data/meterpreter/posix_meterpreter_stage1.bin: source/server/rtld/posix_meterpreter_stage1.bin
-	cp source/server/rtld/posix_meterpeter_stage1.bin data/meterpreter/posix_meterpreter_stage1_ARCH.bin
+data/meterpreter/posix_meterpreter_stage1_${METARCH}.bin: source/server/rtld/stage1
+	cp source/server/rtld/stage1 data/meterpreter/posix_meterpreter_stage1_${METARCH}.bin
 
-source/server/rtld/posix_meterpreter_stage1.bin:
-	$(MAKE) -C source/server/rtld
+source/server/rtld/stage1:
+	$(MAKE) -C source/server/rtld PLATFORM_FILE=$(PLATFORM_FILE) CROSS=${CROSS} BFD_TARGET=${BFD_TARGET} BINARY_ARCHITECTURE=${BINARY_ARCHITECTURE}
 
 $(workspace)/metsrv/libmetsrv_main.so: $(COMPILED)/libsupport.so
-	$(MAKE) -C $(workspace)/metsrv
+	$(MAKE) -C $(workspace)/metsrv CROSS=${CROSS}
 
 $(COMPILED)/libmetsrv_main.so: $(workspace)/metsrv/libmetsrv_main.so
 	cp $(workspace)/metsrv/libmetsrv_main.so $(COMPILED)/libmetsrv_main.so
 
 $(workspace)/common/libsupport.so:
-	$(MAKE) -C $(workspace)/common # CROSS=${CROSS}
+	$(MAKE) -C $(workspace)/common CROSS=${CROSS}
 
 $(COMPILED)/libsupport.so: $(workspace)/common/libsupport.so
 	cp $(workspace)/common/libsupport.so $(COMPILED)/libsupport.so
 
 $(workspace)/ext_server_sniffer/ext_server_sniffer.so: $(COMPILED)/libpcap.so
-	$(MAKE) -C $(workspace)/ext_server_sniffer
+	$(MAKE) -C $(workspace)/ext_server_sniffer CROSS=${CROSS} COMPILED=${COMPILED}
 
-data/meterpreter/ext_server_sniffer.lso: $(workspace)/ext_server_sniffer/ext_server_sniffer.so
-	cp $(workspace)/ext_server_sniffer/ext_server_sniffer.so data/meterpreter/ext_server_sniffer.lso
+data/meterpreter/ext_server_sniffer.${METARCH}lso: $(workspace)/ext_server_sniffer/ext_server_sniffer.so
+	cp $(workspace)/ext_server_sniffer/ext_server_sniffer.so data/meterpreter/ext_server_sniffer.${METARCH}lso
 
 $(workspace)/ext_server_stdapi/ext_server_stdapi.so:
-	$(MAKE) -C $(workspace)/ext_server_stdapi
+	$(MAKE) -C $(workspace)/ext_server_stdapi CROSS=${CROSS} COMPILED=${COMPILED}
 
-data/meterpreter/ext_server_stdapi.lso: $(workspace)/ext_server_stdapi/ext_server_stdapi.so
-	cp $(workspace)/ext_server_stdapi/ext_server_stdapi.so data/meterpreter/ext_server_stdapi.lso
+data/meterpreter/ext_server_stdapi.${METARCH}lso: $(workspace)/ext_server_stdapi/ext_server_stdapi.so
+	cp $(workspace)/ext_server_stdapi/ext_server_stdapi.so data/meterpreter/ext_server_stdapi.${METARCH}lso
 
 $(workspace)/ext_server_networkpug/ext_server_networkpug.so:
-	$(MAKE) -C $(workspace)/ext_server_networkpug
+	$(MAKE) -C $(workspace)/ext_server_networkpug CROSS=${CROSS} COMPILED=${COMPILED}
 
-data/meterpreter/ext_server_networkpug.lso: $(workspace)/ext_server_networkpug/ext_server_networkpug.so
-	cp $(workspace)/ext_server_networkpug/ext_server_networkpug.so data/meterpreter/ext_server_networkpug.lso
+data/meterpreter/ext_server_networkpug.${METARCH}lso: $(workspace)/ext_server_networkpug/ext_server_networkpug.so
+	cp $(workspace)/ext_server_networkpug/ext_server_networkpug.so data/meterpreter/ext_server_networkpug.${METARCH}lso
 
 
 install: $(outputs)
 	cp $(outputs) $(framework_dir)/data/meterpreter/
 
+clean: METARCH=*
 clean:
 	rm -f $(objects)
 	make -C source/server/rtld/ clean
 	make -C $(workspace) clean
 	rm -rf $(build_tmp)/compiled
 
-depclean:
-	rm -rf source/openssl/lib/linux/i386/
+cleaner: clean clean-pcap clean-ssl
+	@echo "Who looks beautiful now?"
+
+tmpclean:
 	rm -rf $(build_tmp)
 
 clean-pcap:
@@ -213,7 +236,7 @@ clean-ssl:
 
 
 
-really-clean: clean clean-ssl clean-pcap depclean
+really-clean: clean clean-ssl clean-pcap tmpclean
 
 
 .PHONY: clean clean-ssl clean-pcap really-clean debug

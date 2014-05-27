@@ -256,7 +256,7 @@ void trap_handler(int sig, siginfo_t *info, void *_ctx)
 	ret = NULL;
 	emulated = 0;
 
-#if 1
+#if 0
 #ifdef __mips__
 	printf("PC is %08x\n", mctx->pc);
 	for(i = 0; i < 32; i++) {
@@ -303,7 +303,7 @@ void trap_handler(int sig, siginfo_t *info, void *_ctx)
 #endif
 
 	printf("First three arguments are as follows\n");
-	printf("0x%llx 0x%llx 0x%llx\n",
+	printf("%p %p %p\n",
 		platform_arg(mctx, 0),
 		platform_arg(mctx, 1),
 		platform_arg(mctx, 2)
@@ -317,6 +317,12 @@ void trap_handler(int sig, siginfo_t *info, void *_ctx)
 			printf("--> found offset at %d, which is %s! <--\n", i, library_calls[i]);
 			break;
 		}
+	}
+
+	if(! in_dlopen) {
+		printf("shortcutting execution since not in dlopen / dlopenbuf cases we're interested in\n");
+		platform_continue_execution(mctx, i);
+		return;
 	}
 
 	switch(i) {
@@ -600,7 +606,5 @@ int main(int argc, char **argv, char **envp)
 
 	printf("server_setup() returned ... :-(\n");
 	fflush(stdout);
-	crash();
-
-	return 0;
+	_exit(0);
 }
