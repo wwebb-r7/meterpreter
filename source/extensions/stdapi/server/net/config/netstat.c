@@ -807,7 +807,7 @@ DWORD linux_get_connection_table(Remote *remote, Packet *response)
 
 	dprintf("getting connection list through /proc/net");
 	result = linux_proc_get_connection_table(&table_connection);
-	dprintf("result = %d, table_connection = 0x%p , entries : %d", result, table_connection, table_connection->entries);
+	dprintf("result = %d, table_connection = %p , entries : %d", result, table_connection, table_connection->entries);
 
 	for(index = 0; index < table_connection->entries; index++) {
 		Tlv connection[9];

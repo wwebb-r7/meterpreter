@@ -270,7 +270,7 @@ DWORD request_sys_process_execute(Remote *remote, Packet *packet)
 			memset(&chops, 0, sizeof(PoolChannelOps));
 
 			// Initialize the channel operations
-			dprintf( "[PROCESS] context address 0x%p", ctx );
+			dprintf( "[PROCESS] context address %p", ctx );
 			chops.native.context  = ctx;
 			chops.native.write    = process_channel_write;
 			chops.native.close    = process_channel_close;
@@ -672,7 +672,7 @@ DWORD request_sys_process_execute(Remote *remote, Packet *packet)
 			memset(&chops, 0, sizeof(PoolChannelOps));
 
 			// Initialize the channel operations
-			dprintf( "[PROCESS] context address 0x%p", ctx );
+			dprintf( "[PROCESS] context address %p", ctx );
 			chops.native.context  = ctx;
 			chops.native.write    = process_channel_write;
 			chops.native.close    = process_channel_close;
@@ -1120,7 +1120,7 @@ DWORD process_channel_interact_destroy( HANDLE waitable, LPVOID entryContext, LP
 	ProcessChannelContext *ctx = (ProcessChannelContext *)threadContext;
 	DWORD dwResult = ERROR_SUCCESS;
 
-	dprintf( "[PROCESS] terminating context 0x%p", ctx );
+	dprintf( "[PROCESS] terminating context %p", ctx );
 
 #ifdef _WIN32
 

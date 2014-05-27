@@ -159,7 +159,7 @@ VOID channel_destroy(Channel *channel, Packet *request)
 	lock_destroy( channel->lock );
 
 	// Destroy the channel context
-	dprintf( "[CHANNEL] Free up the channel context 0x%p", channel );
+	dprintf( "[CHANNEL] Free up the channel context %p", channel );
 	free(channel);
 }
 

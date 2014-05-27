@@ -566,7 +566,7 @@ DWORD remote_request_core_channel_interact(Remote *remote, Packet *packet)
 			NativeChannelOps *native = (NativeChannelOps *)&channel->ops;
 
 			// Check to see if this channel has a registered interact handler
-			dprintf( "[DISPATCH] attempting to set interactive: %d context 0x%p", interact, native->context );
+			dprintf( "[DISPATCH] attempting to set interactive: %d context %p", interact, native->context );
 			if (native->interact) {
 				result = native->interact(channel, packet, native->context, interact);
 			}

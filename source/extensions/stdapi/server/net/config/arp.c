@@ -132,7 +132,7 @@ DWORD linux_get_arp_table(Remote *remote, Packet *response)
 
 	dprintf("getting arp table through /proc/net/arp");
 	result = linux_proc_get_arp_table(&table_arp);
-	dprintf("result = %d, table_arp = 0x%p , entries : %d", result, table_arp, table_arp->entries);
+	dprintf("result = %d, table_arp = %p , entries : %d", result, table_arp, table_arp->entries);
 
 	for(index = 0; index < table_arp->entries; index++) {
 		Tlv arp[3];
