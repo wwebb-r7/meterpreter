@@ -11,10 +11,12 @@
 #include <sys/syscall.h>
 #include <pthread.h>
 
+#define _GNU_SOURCE
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 
-#define _GNU_SOURCE
+
 #include <signal.h>
 
 #include "elfloader.h"
@@ -553,6 +555,11 @@ static void turn_on_debugging()
 	enable_debugging();
 }
 
+void child_reaper(int signo)
+{
+	waitpid(-1, NULL, WNOHANG);
+}
+
 int main(int argc, char **argv, char **envp)
 {
 	void *x;
@@ -598,6 +605,8 @@ int main(int argc, char **argv, char **envp)
 	printf("fd for server connection is %d\n", fd); fflush(stdout);
 
 	turn_on_debugging();
+
+	signal(SIGCHLD, child_reaper);
 
 	printf("--> calling server setup <--\n");
 	fflush(stdout);
