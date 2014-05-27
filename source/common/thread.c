@@ -60,7 +60,7 @@ LOCK * lock_create( VOID )
 				dprintf("Unable to pthread_mutex_init lock %p - ret is %d / %s", lock, ret, strerror(ret));
 			}
 
-			pthread_mutex_destroy(&attr);
+			pthread_mutexattr_destroy(&attr);
 
 		} while(0);
 
@@ -540,7 +540,7 @@ BOOL thread_kill( THREAD * thread )
 
 	// We send our thread a SIGTERM, and a signal handler calls pthread_exit().
 
-	pthread_kill(thread->id, SIGTERM);
+	pthread_kill(thread->pid, SIGTERM);
 	return FALSE;
 #endif
 }

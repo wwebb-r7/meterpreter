@@ -211,14 +211,15 @@ VOID command_join_threads(VOID)
  * @detail Each thread appears as a process and pthread_join don't necessarily reap it
  * threads are created using the clone syscall, so use special __WCLONE flag in waitpid.
  */
-VOID reap_zombie_thread(void * param)
+VOID *reap_zombie_thread(void * param)
 {
 	while(1)
 	{
 		waitpid(-1, NULL, __WCLONE);
 		// on 2.6 kernels, don't chew 100% CPU
-		usleep(500000);
+		usleep(1000000);
 	}
+	return NULL;
 }
 #endif
 
