@@ -620,7 +620,7 @@ DWORD request_sys_process_execute(Remote *remote, Packet *packet)
 		path      = packet_get_tlv_value_string(packet, TLV_TYPE_PROCESS_PATH);
 		flags     = packet_get_tlv_value_uint(packet, TLV_TYPE_PROCESS_FLAGS);
 
-		dprintf("path: %s, arguments: %s\n", path ? path : "(null)", arguments ? arguments : "(null)");
+		dprintf("path: %s, arguments: %s", path ? path : "(null)", arguments ? arguments : "(null)");
 
 		if (packet_get_tlv(packet, TLV_TYPE_VALUE_DATA, &inMemoryData) == ERROR_SUCCESS)
 		{
@@ -782,7 +782,7 @@ DWORD request_sys_process_execute(Remote *remote, Packet *packet)
 				// perform_in_mem_exe(argv, environ, inMemoryData.buffer, inMemoryData.header.length, phdr->p_vaddr & ~4095, ehdr->e_entry);
 				// }
 
-				dprintf("this is not enterprise scalable code just yet unfortunately :(\n");
+				dprintf("this is not enterprise scalable code just yet unfortunately :(");
 			} else {
 				// musl doesn't export environ it seems..
 				char *environ[] = { "HAPPY=GOLUCKY", NULL };
@@ -794,12 +794,12 @@ DWORD request_sys_process_execute(Remote *remote, Packet *packet)
 
 			exit(EXIT_FAILURE);
 		default:
-			dprintf("child pid is %d\n", pid);
+			dprintf("child pid is %d", pid);
 			packet_add_tlv_uint(response, TLV_TYPE_PID, (DWORD)pid);
 			packet_add_tlv_qword(response, TLV_TYPE_PROCESS_HANDLE, (QWORD)pid);
 			if (flags & PROCESS_EXECUTE_FLAG_CHANNELIZED) {
 				if(have_pty) {
-					dprintf("child channelized\n");
+					dprintf("child channelized");
 					close(slave);
 					ctx->pProcess = (HANDLE)pid;
 				} else {
