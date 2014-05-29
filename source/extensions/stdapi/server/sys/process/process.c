@@ -610,7 +610,7 @@ DWORD request_sys_process_execute(Remote *remote, Packet *packet)
 	int have_pty = -1;
 	ProcessChannelContext * ctx = NULL;
 
-	int hidden = (flags & PROCESS_EXECUTE_FLAG_HIDDEN);
+	int hidden;
 
 	dprintf( "[PROCESS] request_sys_process_execute" );
 
@@ -619,6 +619,7 @@ DWORD request_sys_process_execute(Remote *remote, Packet *packet)
 		arguments = packet_get_tlv_value_string(packet, TLV_TYPE_PROCESS_ARGUMENTS);
 		path      = packet_get_tlv_value_string(packet, TLV_TYPE_PROCESS_PATH);
 		flags     = packet_get_tlv_value_uint(packet, TLV_TYPE_PROCESS_FLAGS);
+		hidden = (flags & PROCESS_EXECUTE_FLAG_HIDDEN);
 
 		dprintf("path: %s, arguments: %s", path ? path : "(null)", arguments ? arguments : "(null)");
 
