@@ -477,6 +477,38 @@ void *dlopenbuf(char *name, void *data, size_t len)
 	blob_in.blob = data;
 	blob_in.length = len;
 
+	if(! loader_info.base) {
+		// If you're running stage3 code, this bit will be executed.
+		// Since stage3 is meant to help with debugging, it's not really
+		// a forensic/etc concern :>
+
+		char *path = NULL;
+		int fd;
+		r = NULL;
+
+		asprintf(&path, "/tmp/meterpreter-dlopenbuf-%d-%s", getpid(), name);
+		if(! path) return NULL;
+
+		fd = open(path, O_WRONLY|O_TRUNC|O_CREAT, 0755);
+		if(fd == -1) {
+			free(path);
+			return NULL;
+		}
+
+		if(write(fd, data, len) != len) {
+			printf("failed to write %d to %s - %s\n", len, path, strerror(errno));
+			free(path);
+			close(fd);
+			return NULL;
+		}
+
+		close(fd);
+
+		r = dlopen(path, RTLD_NOW|RTLD_GLOBAL);
+		free(path);
+		return r;
+	}
+
 	if(strlen(name) >= (32 - 4)) {
 		printf("Filename is too big!\n");
 		return NULL;
