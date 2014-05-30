@@ -806,7 +806,6 @@ DWORD request_sys_process_execute(Remote *remote, Packet *packet)
 				} else {
 					close(in[0]);
 					close(out[1]);
-					close(out[2]);
 				}
 			}
 			break;
@@ -1058,7 +1057,7 @@ DWORD process_channel_read(Channel *channel, Packet *request,
 		result = GetLastError();
 #else
 	if ( (*bytesRead = read( ctx->pStdout, buffer, bufferSize )) < 0 ) {
-		result = GetLastError();
+		result = errno;
 		// Always return zero bytes read on error
 		*bytesRead = 0;
 	}
