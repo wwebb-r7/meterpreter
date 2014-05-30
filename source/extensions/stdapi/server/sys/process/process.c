@@ -728,7 +728,7 @@ DWORD request_sys_process_execute(Remote *remote, Packet *packet)
 				// XXX This is possible, due to chroots etc. We could close
 				// fd 0/1/2 and hope the program isn't buggy.
 
-				result = GetLastError();
+				result = errno;
 				break;
 			}
 		}
@@ -804,6 +804,7 @@ DWORD request_sys_process_execute(Remote *remote, Packet *packet)
 					close(slave);
 					ctx->pProcess = (HANDLE)pid;
 				} else {
+					close(devnull);
 					close(in[0]);
 					close(out[1]);
 				}
