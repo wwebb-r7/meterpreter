@@ -23,11 +23,17 @@ general:
 
   Perhaps moving to http://ellcc.org might be worthwhile?
 
+  Doesn't support address sanitizer :(
+
   --
 
   Verify the main thread code is reset during starting the newly
   loaded musl libc entry point code, otherwise work out how to fix
   that in stage3.
 
-  
+  --
+
+  GetLastError() uses a macro and global variable per .o of local_error,
+  this needs to be fixed because it's racy, and incorrect in general :>
+
 

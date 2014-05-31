@@ -18,6 +18,10 @@ debugging tools present - such as valgrind for finding / isolating bugs,
 since the libraries will be mmap()d in using standard library and kernel
 interfaces.
 
+XXX - It is probably a good idea to perform stage3 testing (of all the
+below, used with address sanitizer to identify out of bounds memory
+access).
+
 ## Compile Checklist
 
 For when changes to meterpreter source code occurs
