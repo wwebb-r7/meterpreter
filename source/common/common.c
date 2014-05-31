@@ -60,9 +60,20 @@ void real_dprintf(char *filename, int line, const char *function, char *format, 
 	int size;
 	static int fd;
 	int retried = 0;
+	char *tmp;
 
-	filename = basename(filename);
-	size = snprintf(buffer, sizeof(buffer), "[%s:%d (%s)] ", filename, line, function);
+	// basename probably isn't thread safe, and can modify it's
+	// argument. so we do a poor mans safe implementation, for
+	// now.
+
+	tmp = strrchr(filename, '/');
+	if(tmp) {
+		tmp++;
+	} else {
+		tmp = filename;
+	}
+
+	size = snprintf(buffer, sizeof(buffer), "[%s:%d (%s)] ", tmp, line, function);
 
 	va_start(args, format);
 	vsnprintf(buffer + size, sizeof(buffer) - size, format, args);
