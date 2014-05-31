@@ -50,7 +50,7 @@ DWORD request_core_loadlib(Remote *remote, Packet *packet)
 		dprintf("targetPath: %s", targetPath);
 
 		library = dlopenbuf(targetPath, dataTlv.buffer, dataTlv.header.length);
-		dprintf("dlopenbuf(%s): %08x / %s", targetPath, library, dlerror());
+		dprintf("dlopenbuf(%s): %p / %s", targetPath, library, dlerror());
 		if (!library)
 		{
 			res = ERROR_NOT_FOUND;
