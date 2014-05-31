@@ -19,6 +19,9 @@ CFLAGS+= -L../../posix-meterp-build-tmp/compiled/
 objects = args.o base.o base_dispatch.o base_dispatch_common.o buffer.o \
 	channel.o common.o core.o list.o remote.o thread.o xor.o zlib.o
 
+ifeq ($(CC),cc)
+	CC=gcc
+endif
 
 
 ####### check platform
@@ -52,10 +55,10 @@ debug: CFLAGS+=-ggdb
 debug: all
 
 .c.o:
-	$(CROSS)gcc $(CFLAGS) -c $<
+	$(CROSS)$(CC) $(CFLAGS) -c $<
 
 libsupport.so: $(objects)
-	$(CROSS)gcc $(CFLAGS) -shared $(objects) -lssl -lcrypto -o $@
+	$(CROSS)$(CC) $(CFLAGS) -shared $(objects) -lssl -lcrypto -o $@
 
 clean:
 	rm -f *.o *.a *.so zlib/zlib.o

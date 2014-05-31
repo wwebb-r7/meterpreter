@@ -27,6 +27,10 @@ outputs += data/meterpreter/ext_server_stdapi.${METARCH}lso
 outputs += data/meterpreter/ext_server_sniffer.${METARCH}lso
 outputs += data/meterpreter/ext_server_networkpug.${METARCH}lso
 
+ifeq ($(CC),cc)
+	CC=gcc
+endif
+
 workspace = workspace
 
 all: $(COMPILED) $(objects) $(outputs)
@@ -148,7 +152,7 @@ $(build_tmp)/openssl-1.0.1g/libssl.so:
 	[ -d $(build_tmp) ] || mkdir $(build_tmp)
 	[ -d $(build_tmp)/openssl-1.0.1g ] || tar -C $(build_tmp)/ -xzf $(build_dep)/openssl-1.0.1g.tar.gz
 	(cd $(build_tmp)/openssl-1.0.1g &&                                                       \
-		 CC="${CROSS}gcc" AR="${CROSS}ar" RANLIB="${CROSS}ranlib" LD="${CROSS}ld" MAKEDEPPROG="${CROSS}gcc" ./Configure --prefix=/tmp/out threads shared no-hw no-dlfcn no-zlib no-krb5 no-idea linux-generic32 && \
+		 CC="${CROSS}${CC}" AR="${CROSS}ar" RANLIB="${CROSS}ranlib" LD="${CROSS}ld" MAKEDEPPROG="${CROSS}gcc" ./Configure --prefix=/tmp/out threads shared no-hw no-dlfcn no-zlib no-krb5 no-idea linux-generic32 && \
 		patch -p1 < $(ROOT)/patches/linux-musl-libc-termios.patch \
 	)
 	(cd $(build_tmp)/openssl-1.0.1g && $(MAKE) depend all ; [ -f libssl.so.1.0.0 -a -f libcrypto.so.1.0.0 ] )
@@ -159,7 +163,7 @@ $(COMPILED)/libpcap.so: $(build_tmp)/libpcap-1.5.3/libpcap.so.1.5.3
 $(build_tmp)/libpcap-1.5.3/libpcap.so.1.5.3:
 	[ -d $(build_tmp) ] || mkdir $(build_tmp)
 	[ -f $(build_tmp)/libpcap-1.5.3/configure ] || tar -C $(build_tmp) -xzf $(build_dep)/libpcap-1.5.3.tar.gz
-	(cd $(build_tmp)/libpcap-1.5.3 && CC="${CROSS}gcc" AR="${CROSS}ar" RANLIB="${CROSS}ranlib" LD="${CROSS}ld" MAKEDEPPROG="${CROSS}gcc"  ./configure --host=${PCAP_HOST} --with-pcap=linux --disable-bluetooth --without-bluetooth --without-usb --disable-usb --without-can --disable-can --without-usb-linux --disable-usb-linux --without-libnl)
+	(cd $(build_tmp)/libpcap-1.5.3 && CC="${CROSS}${CC}" AR="${CROSS}ar" RANLIB="${CROSS}ranlib" LD="${CROSS}ld" MAKEDEPPROG="${CROSS}gcc"  ./configure --host=${PCAP_HOST} --with-pcap=linux --disable-bluetooth --without-bluetooth --without-usb --disable-usb --without-can --disable-can --without-usb-linux --disable-usb-linux --without-libnl)
 	echo '#undef HAVE_DECL_ETHER_HOSTTON' >> $(build_tmp)/libpcap-1.5.3/config.h
 	echo '#undef HAVE_SYS_BITYPES_H' >> $(build_tmp)/libpcap-1.5.3/config.h
 	echo '#undef PCAP_SUPPORT_CAN' >> $(build_tmp)/libpcap-1.5.3/config.h
@@ -175,34 +179,34 @@ data/meterpreter/posix_meterpreter_stage1_${METARCH}.bin: source/server/rtld/sta
 	cp source/server/rtld/stage1 data/meterpreter/posix_meterpreter_stage1_${METARCH}.bin
 
 source/server/rtld/stage1:
-	$(MAKE) -C source/server/rtld PLATFORM_FILE=$(PLATFORM_FILE) CROSS=${CROSS} BFD_TARGET=${BFD_TARGET} BINARY_ARCHITECTURE=${BINARY_ARCHITECTURE}
+	$(MAKE) -C source/server/rtld PLATFORM_FILE=$(PLATFORM_FILE) CROSS=${CROSS} BFD_TARGET=${BFD_TARGET} BINARY_ARCHITECTURE=${BINARY_ARCHITECTURE} CC="${CC}"
 
 $(workspace)/metsrv/libmetsrv_main.so: $(COMPILED)/libsupport.so
-	$(MAKE) -C $(workspace)/metsrv CROSS=${CROSS}
+	$(MAKE) -C $(workspace)/metsrv CROSS=${CROSS} CC="${CC}"
 
 $(COMPILED)/libmetsrv_main.so: $(workspace)/metsrv/libmetsrv_main.so
 	cp $(workspace)/metsrv/libmetsrv_main.so $(COMPILED)/libmetsrv_main.so
 
 $(workspace)/common/libsupport.so:
-	$(MAKE) -C $(workspace)/common CROSS=${CROSS}
+	$(MAKE) -C $(workspace)/common CROSS=${CROSS} CC="${CC}"
 
 $(COMPILED)/libsupport.so: $(workspace)/common/libsupport.so
 	cp $(workspace)/common/libsupport.so $(COMPILED)/libsupport.so
 
 $(workspace)/ext_server_sniffer/ext_server_sniffer.so: $(COMPILED)/libpcap.so
-	$(MAKE) -C $(workspace)/ext_server_sniffer CROSS=${CROSS} COMPILED=${COMPILED}
+	$(MAKE) -C $(workspace)/ext_server_sniffer CROSS=${CROSS} COMPILED=${COMPILED} CC="${CC}"
 
 data/meterpreter/ext_server_sniffer.${METARCH}lso: $(workspace)/ext_server_sniffer/ext_server_sniffer.so
 	cp $(workspace)/ext_server_sniffer/ext_server_sniffer.so data/meterpreter/ext_server_sniffer.${METARCH}lso
 
 $(workspace)/ext_server_stdapi/ext_server_stdapi.so:
-	$(MAKE) -C $(workspace)/ext_server_stdapi CROSS=${CROSS} COMPILED=${COMPILED}
+	$(MAKE) -C $(workspace)/ext_server_stdapi CROSS=${CROSS} COMPILED=${COMPILED} CC="${CC}"
 
 data/meterpreter/ext_server_stdapi.${METARCH}lso: $(workspace)/ext_server_stdapi/ext_server_stdapi.so
 	cp $(workspace)/ext_server_stdapi/ext_server_stdapi.so data/meterpreter/ext_server_stdapi.${METARCH}lso
 
 $(workspace)/ext_server_networkpug/ext_server_networkpug.so:
-	$(MAKE) -C $(workspace)/ext_server_networkpug CROSS=${CROSS} COMPILED=${COMPILED}
+	$(MAKE) -C $(workspace)/ext_server_networkpug CROSS=${CROSS} COMPILED=${COMPILED} CC="${CC}"
 
 data/meterpreter/ext_server_networkpug.${METARCH}lso: $(workspace)/ext_server_networkpug/ext_server_networkpug.so
 	cp $(workspace)/ext_server_networkpug/ext_server_networkpug.so data/meterpreter/ext_server_networkpug.${METARCH}lso

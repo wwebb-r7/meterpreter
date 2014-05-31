@@ -19,6 +19,10 @@ debug: DEBUG=true
 debug: CFLAGS+=-ggdb
 debug: all
 
+ifeq ($(CC),cc)
+	CC=gcc
+endif
+
 platform.c:
 	ln -s platform-$(PLATFORM_FILE).c platform.c
 
@@ -26,10 +30,10 @@ gzip2raw: gzip2raw.c
 	gcc -Wall -ggdb -O2 gzip2raw.c -o gzip2raw
 
 platform.o: platform.c platform.h
-	$(CROSS)gcc $(CFLAGS) -c platform.c
+	$(CROSS)$(CC) $(CFLAGS) -c platform.c
 
 stage3: gzip2raw stage3.c elfloader.o platform.o
-	$(CROSS)gcc -Wall -ggdb -O2 -pie -fPIC -Wl,--dynamic-list=symbols -o stage3 stage3.c elfloader.o platform.o
+	$(CROSS)$(CC) -Wall -ggdb -O2 -pie -fPIC -Wl,--dynamic-list=symbols -o stage3 stage3.c elfloader.o platform.o -ldl
 	([ "$(DEBUG)" != "true" ] && $(CROSS)strip --strip-debug stage3) || true
 	gzip -9nfc < stage3 >stage3.gz
 	./gzip2raw stage3.gz stage3.raw
@@ -85,13 +89,13 @@ blob.o: blob.h
 stage1.o: stage3 stage3.o $(LIBOBJECTS) libc_offsets.h symbols blob.h elfloader.h 
 
 stage1: $(LIBOBJECTS) $(OBJ) stage1.c stage1.o stage3.o libc_offsets.h stage3 blob.o elfloader.o
-	$(CROSS)gcc -static -Os -Wall -ggdb stage1.o elfloader.o blob.o stage3.o $(LIBOBJECTS) $(OBJ) -o stage1
+	$(CROSS)$(CC) -static -Os -Wall -ggdb stage1.o elfloader.o blob.o stage3.o $(LIBOBJECTS) $(OBJ) -o stage1
 
 .S.o:
-	$(CROSS)gcc $(CFLAGS) -c $<
+	$(CROSS)$(CC) $(CFLAGS) -c $<
 
 .c.o:
-	$(CROSS)gcc $(CFLAGS) -c $<
+	$(CROSS)$(CC) $(CFLAGS) -c $<
 
 clean:
 	rm -f $(OBJECTS)

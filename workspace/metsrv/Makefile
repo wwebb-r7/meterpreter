@@ -18,6 +18,10 @@ OSVPATH=../../source/common/arch/$(OS):../../source/server/linux/
 ARCHVPATH=$(OSVPATH)/$(RARCH):$(ELFARCHPATH)
 VPATH=$(BASEVPATH):$(OSVPATH):$(ARCHVPATH)
 
+ifeq ($(CC),cc)
+	CC=gcc
+endif
+
 objects= metsrv.o scheduler.o 
 objects+= server_setup.o remote_dispatch_common.o remote_dispatch.o netlink.o
 
@@ -27,10 +31,10 @@ debug: CFLAGS+=-ggdb
 debug: all
 
 .c.o:
-	$(CROSS)gcc $(CFLAGS) -c $<
+	$(CROSS)$(CC) $(CFLAGS) -c $<
 
 libmetsrv_main.so: $(objects)
-	$(CROSS)gcc -shared $(CFLAGS) -o $@ $(objects) -export-dynamic  -lcrypto -lssl  -lsupport
+	$(CROSS)$(CC) -shared $(CFLAGS) -o $@ $(objects) -export-dynamic  -lcrypto -lssl  -lsupport
 
 clean:
 	@echo "ARCHVPATH= " $(ARCHVPATH) " VPATH= " $(VPATH)

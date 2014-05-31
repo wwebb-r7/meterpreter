@@ -19,6 +19,10 @@ else
 	CFLAGS+= -fno-stack-protector -D__linux__
 endif
 
+ifeq ($(CC),cc)
+	CC=gcc
+endif
+
 LDFLAGS=-L../../posix-meterp-build-tmp/compiled/ -lcrypto -lssl -lsupport -lmetsrv_main
 
 objects = \
@@ -51,10 +55,10 @@ debug: CFLAGS+=-ggdb
 debug: all
 
 .c.o:
-	$(CROSS)gcc $(CFLAGS) -c $<
+	$(CROSS)$(CC) $(CFLAGS) -c $<
 
 ext_server_stdapi.so: $(objects)
-	$(CROSS)gcc -shared $(CFLAGS) -o $@ $(local_objects) $(LDFLAGS)
+	$(CROSS)$(CC) -shared $(CFLAGS) -o $@ $(local_objects) $(LDFLAGS)
 
 
 .PHONY: clean debug
