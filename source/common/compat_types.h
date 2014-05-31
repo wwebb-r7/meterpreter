@@ -186,7 +186,7 @@ typedef UCHAR *		PUCHAR;
 typedef	CSTR *		LPCSTR;
 typedef	CWSTR *		LPCWSTR;
 typedef	char *		LPSTR;
-typedef	long		DWORD;
+typedef	int		DWORD;
 typedef	DWORD *		LPDWORD;
 typedef	int32_t		LONG;
 typedef	LONG *		LPLONG;
