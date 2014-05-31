@@ -3,11 +3,13 @@
 
 extern Command *extensionCommands;
 
+void *dlopenbuf(char *name, void *data, size_t len);
+
 DWORD request_core_loadlib(Remote *remote, Packet *packet)
 {
 	Packet *response = packet_create_response(packet);
 	DWORD res = ERROR_SUCCESS;
-	HMODULE library;
+	void *library;
 	PCHAR libraryPath;
 	DWORD flags = 0;
 	PCHAR targetPath;
@@ -63,7 +65,10 @@ DWORD request_core_loadlib(Remote *remote, Packet *packet)
 		{
 			DWORD(*init)(Remote *remote);
 
+			dprintf("dlsym(%p, \"InitServerExtension\")", library);
 			init = dlsym(library, "InitServerExtension");
+			dprintf("init is at %p", init);
+
 			// Call the init routine in the library
 			if (init)
 			{
