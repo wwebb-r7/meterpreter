@@ -190,6 +190,22 @@ Another way to do debugging is to note the crash location, and take the last
 three nibbles, and the instruction and objdump -d the various libraries to find
 where abouts it crashed, to get a backtrace that way.
 
+Building for address sanitizer
+------------------------------
+
+To build using address sanitizer, the following command should get you started:
+
+```
+make CC="gcc -fsanitize=address -Ddomainname=nodename " METARCH=x64  PLATFORM_FILE=x86_64 BINARY_ARCHITECTURE=i386 BFD_TARGET=elf64-x86-64  OPENSSL_TARGET=linux-x86_64
+```
+
+The "-Ddomainname=nodename" is used because of differences between musl libc
+headers and glibc headers. The other variables are taken from the top of the
+Makefile.
+
+At some stage, it should be made easier for building with it, but for now,
+this will do.
+
 Testing
 =======
 
