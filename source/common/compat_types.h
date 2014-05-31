@@ -177,8 +177,8 @@ typedef	void *		LPVOID;
 typedef	char		BYTE;
 
 
-typedef	uint32_t	ULONG;
-typedef	uint32_t *	PULONG;
+typedef	long	ULONG;
+typedef	long *	PULONG;
 typedef	const char	CSTR;
 typedef	const wchar_t	CWSTR;
 typedef	unsigned char	UCHAR;
@@ -188,7 +188,7 @@ typedef	CWSTR *		LPCWSTR;
 typedef	char *		LPSTR;
 typedef	int		DWORD;
 typedef	DWORD *		LPDWORD;
-typedef	int32_t		LONG;
+typedef	long		LONG;
 typedef	LONG *		LPLONG;
 typedef	unsigned int	UINT;
 typedef	int		HANDLE;
@@ -235,11 +235,9 @@ typedef uint64_t	QWORD;
  #define INVALID_SOCKET (-1)
 #endif /* __WIN32__  */
 
-int local_error;
-
 #define WSAGetLastError()	GetLastError()
-#define	GetLastError()		(local_error != -1 ? local_error : errno)
-#define	SetLastError(x)		(local_error = (x))
+#define	GetLastError()		(errno)
+#define	SetLastError(x)		(errno = (x))
 #define	__declspec(x) 
 
 #define	__try
