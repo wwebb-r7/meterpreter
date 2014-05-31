@@ -630,7 +630,7 @@ DWORD linux_parse_proc_net_file(char * filename, struct connection_table ** tabl
 		current_connection = &(*table_connection)->table[(*table_connection)->entries];
 
 		if (type == AF_INET) {
-			if (sscanf(buffer, " %*u: %lX:%x %lX:%x %x %*X:%*X %*x:%*X %*x %u %*u %u %[^\n] ", &local_addr, &local_port,
+			if (sscanf(buffer, " %*u: %08X:%04x %08X:%04x %02x %*X:%*X %*x:%*X %*x %u %*u %u %[^\n] ", &local_addr, &local_port,
 				&remote_addr, &remote_port, &state, &uid, &inode, buffer_junk) == 8) {
 
 				current_connection->local_addr.addr  = local_addr;
