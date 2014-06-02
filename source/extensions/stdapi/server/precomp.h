@@ -22,6 +22,7 @@
  #include <fcntl.h>
  #include <sys/wait.h>
  #include <termios.h>
+ #include <sys/ioctl.h>
 
  #include <linux/if.h>
  #include <linux/netlink.h>
