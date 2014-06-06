@@ -606,7 +606,7 @@ DWORD request_sys_process_execute(Remote *remote, Packet *packet)
 	int master = -1, slave = -1;
 	int devnull = -1;
 	int idx, i;
-	pid_t pid;
+	pid_t pid, sid;
 	int have_pty = -1;
 	ProcessChannelContext * ctx = NULL;
 
@@ -747,6 +747,11 @@ DWORD request_sys_process_execute(Remote *remote, Packet *packet)
 			break;
 
 		case 0:
+			sid = setsid();
+			if(sid == -1) {
+				dprintf("setsid() failed: %s", strerror(errno));
+			}
+
 			if (flags & PROCESS_EXECUTE_FLAG_CHANNELIZED)
 			{
 				if(have_pty)
